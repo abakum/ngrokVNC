@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -16,9 +15,8 @@ import (
 
 func viewerl() {
 	var (
-		err       error
-		tvnviewer = filepath.Join(TightVNC, "tvnviewer.exe")
-		port      = 5500
+		err  error
+		port = 5500
 	)
 	defer closer.Close()
 
@@ -30,13 +28,13 @@ func viewerl() {
 		// pressEnter()
 	})
 
-	li.Println("VNC viewer listen mode - наблюдатель ожидает подключения экрана VNC")
+	li.Println("VNC viewer listen mode - VNC наблюдатель ожидает подключения экрана VNC")
 	li.Println(os.Args[0], "port")
 	li.Println(os.Args)
 
 	// -port as LAN viewer listen mode
-	// port as LAN ngrok listen mode
-	// 0  as 5500 LAN ngrok listen mode
+	// port as ngrok viewer listen mode
+	// 0  as 5500
 	if len(os.Args) > 1 {
 		p, _ := strconv.Atoi(abs(os.Args[1]))
 		if p < port {

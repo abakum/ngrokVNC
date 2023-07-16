@@ -16,8 +16,10 @@ var (
 	//go:embed NGROK_API_KEY.txt
 	NGROK_API_KEY string
 
-	port     = "5900"
-	TightVNC = `TightVNC`
+	port      = "5900"
+	TightVNC  = "TightVNC"
+	tvnserver = "tvnserver.exe"
+	tvnviewer = "tvnviewer.exe"
 )
 
 func main() {
@@ -38,6 +40,8 @@ func main() {
 		k.Close()
 	}
 	li.Println("TightVNC", TightVNC)
+	tvnserver = filepath.Join(TightVNC, tvnserver)
+	tvnviewer = filepath.Join(TightVNC, tvnviewer)
 
 	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //if emty then local mode
 	// NGROK_AUTHTOKEN += "-"                                       // emulate bad token or no internet
@@ -47,6 +51,11 @@ func main() {
 	if len(os.Args) > 1 {
 		_, err := strconv.Atoi(os.Args[1])
 		if err != nil {
+			// :: try connect server to viewer over ngrok
+			if os.Args[1] == "::" {
+				serverc()
+				return
+			}
 			// host[::port] [password] as LAN viewer connect mode
 			// host[:screen] [password] as LAN viewer connect mode
 			// : [password] as ngrok viewer connect mode
@@ -55,8 +64,8 @@ func main() {
 			return
 		}
 		// -port as LAN viewer listen mode
-		// port as LAN ngrok listen mode
-		// 0  as 5500 LAN ngrok listen mode
+		// port as ngrok viewer listen mode
+		// 0  as 5500
 		viewerl()
 		return
 	}

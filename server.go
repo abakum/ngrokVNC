@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -21,8 +20,7 @@ import (
 
 func server() {
 	var (
-		err       error
-		tvnserver = filepath.Join(TightVNC, "tvnserver.exe")
+		err error
 	)
 	defer closer.Close()
 
@@ -53,10 +51,10 @@ func server() {
 
 	publicURL, _, errC := ngrokAPI(NGROK_API_KEY)
 	rl := errC == nil
-	PrintOk("Remote listen - на дальнем конце слушают", errC)
+	PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
 	errD := dial(":" + port)
 	ll := errD == nil
-	PrintOk("Local listen - на ближнем конце слушают", errD)
+	PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", errD)
 	control := "-controlservice"
 	if !ll {
 		control = "-controlapp"
@@ -107,7 +105,7 @@ func server() {
 	}
 
 	if rl {
-		li.Println("VNC server connect to viewer mode - экран VNC подключается к ожидающему наблюдателю")
+		li.Println("VNC server connect to viewer mode - экран VNC подключается к ожидающему VNC наблюдателю")
 		tcp, err := url.Parse(publicURL)
 		host := publicURL
 		if err == nil {
@@ -138,7 +136,7 @@ func server() {
 		return
 	}
 
-	li.Println("VNC server mode - экран VNC ожидает подключения наблюдателя")
+	li.Println("VNC server mode - экран VNC ожидает подключения VNC наблюдателя")
 	li.Println("port", port)
 	err = run(context.Background(), ":"+port)
 

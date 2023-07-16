@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/xlab/closer"
@@ -13,8 +12,7 @@ import (
 
 func viewer() {
 	var (
-		err       error
-		tvnviewer = filepath.Join(TightVNC, "tvnviewer.exe")
+		err error
 		host,
 		publicURL,
 		pass string
@@ -30,7 +28,7 @@ func viewer() {
 		// pressEnter()
 	})
 
-	li.Println("Viewer mode - наблюдатель подключается к ожидающему экрану VNC")
+	li.Println("Viewer mode - VNC наблюдатель подключается к ожидающему экрану VNC")
 	li.Println(os.Args[0], "[host] [password]")
 	li.Println(os.Args)
 
