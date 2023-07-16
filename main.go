@@ -46,8 +46,26 @@ func main() {
 	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //if emty then local mode
 	// NGROK_AUTHTOKEN += "-"                                       // emulate bad token or no internet
 	// NGROK_AUTHTOKEN = ""                                   // emulate local mode
-	NGROK_API_KEY = Getenv("NGROK_API_KEY", NGROK_API_KEY) //if emty then no crypt
-	// NGROK_API_KEY = ""                                     // emulate no crypt
+	NGROK_API_KEY = Getenv("NGROK_API_KEY", NGROK_API_KEY)
+	// NGROK_API_KEY = ""
+
+	li.Println("Without params and ngrok not exist - без параметров и ngrok туннель отсутствует:")
+	li.Println("VNC server mode - экран VNC ожидает подключения VNC наблюдателя")
+	li.Println("To view over the tunnel on the other side, run - для просмотра через туннель на другой стороне запусти")
+	li.Println("`ngrokVNC :`")
+	li.Println("To view over the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
+	li.Println("`ngrokVNC host`")
+	li.Println()
+	li.Println("Without params and ngrok exist - без параметров и ngrok туннель существует:")
+	li.Println("VNC server connect to viewer mode - экран VNC подключается к ожидающему наблюдателю")
+	li.Println("On the other side was launched - на другой стороне был запущен")
+	li.Println("`ngrokVNC 0`")
+	li.Println()
+	li.Println("To connect the VNC server to the viewer over the ngrok, run - для подключения экрана VNC к наблюдателю через туннель запусти")
+	li.Println("`ngrokVNC ::`")
+	li.Println("On the other side run - на другой стороне запусти")
+	li.Println("`ngrokVNC 0`")
+
 	if len(os.Args) > 1 {
 		_, err := strconv.Atoi(os.Args[1])
 		if err != nil {

@@ -18,8 +18,7 @@ func serverc() {
 		shutdown,
 		cont,
 		sConnect *exec.Cmd
-		control = "-controlservice"
-		TO      = time.Second * 10
+		TO = time.Minute
 	)
 	defer closer.Close()
 
@@ -52,7 +51,7 @@ func serverc() {
 		return
 	}
 
-	li.Println("VNC server try connect to viewer mode - экран VNC пытается подключается к ожидающему VNC наблюдателю")
+	li.Println("VNC server try connect to viewer mode - экран VNC пытается подключится к ожидающему VNC наблюдателю")
 	for {
 		publicURL, _, errC := ngrokAPI(NGROK_API_KEY)
 		rl := errC == nil
@@ -64,7 +63,7 @@ func serverc() {
 		errD := dial(":" + port)
 		ll := errD == nil
 		PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения VNC наблюдателя?", errD)
-		control = "-controlservice"
+		control := "-controlservice"
 		if !ll {
 			control = "-controlapp"
 			if shutdown == nil {
