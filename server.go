@@ -50,13 +50,13 @@ func server() {
 	}
 
 	publicURL, _, errC := ngrokAPI(NGROK_API_KEY)
-	rl := errC == nil
+	remoteListen := errC == nil
 	PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
 	errD := dial(":" + port)
-	ll := errD == nil
+	localListen := errD == nil
 	PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", errD)
 	control := "-controlservice"
-	if !ll {
+	if !localListen {
 		control = "-controlapp"
 		sRun := exec.Command(
 			tvnserver,
@@ -104,7 +104,7 @@ func server() {
 		return
 	}
 
-	if rl {
+	if remoteListen {
 		li.Println("VNC server connect to viewer mode - экран VNC подключается к ожидающему VNC наблюдателю")
 		tcp, err := url.Parse(publicURL)
 		host := publicURL
@@ -119,7 +119,7 @@ func server() {
 		)
 		sConnect.Stdout = os.Stdout
 		sConnect.Stderr = os.Stderr
-		if !ll {
+		if !localListen {
 			closer.Bind(func() {
 				if sConnect.Process != nil && sConnect.ProcessState == nil {
 					shutdown := exec.Command(

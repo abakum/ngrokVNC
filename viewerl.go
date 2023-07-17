@@ -15,8 +15,7 @@ import (
 
 func viewerl() {
 	var (
-		err  error
-		port = 5500
+		err error
 	)
 	defer closer.Close()
 
@@ -36,15 +35,15 @@ func viewerl() {
 	// port as ngrok viewer listen mode
 	// 0  as 5500
 	if len(os.Args) > 1 {
-		p, _ := strconv.Atoi(abs(os.Args[1]))
-		if p < port {
-			port += p
+		i, _ := strconv.Atoi(abs(os.Args[1]))
+		if i < p {
+			p += i
 		} else {
-			port = p
+			p = i
 		}
 	}
 
-	li.Println("port", port)
+	li.Println("port", p)
 	// значение port появляется в поле `Accept Reverse connections on TCP port` на форме `TightVNC Viewer Configuration` но пока не кликнешь OK слушающий порт будет 5500
 	key := `SOFTWARE\TightVNC\Viewer\Settings`
 	k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.QUERY_VALUE|registry.SET_VALUE)
@@ -52,8 +51,8 @@ func viewerl() {
 	if err == nil {
 		key = "ListenPort"
 		old, _, err := k.GetIntegerValue(key)
-		if old != uint64(port) || err != nil {
-			PrintOk(key, k.SetDWordValue(key, uint32(port)))
+		if old != uint64(p) || err != nil {
+			PrintOk(key, k.SetDWordValue(key, uint32(p)))
 		}
 		k.Close()
 	}
@@ -89,7 +88,7 @@ func viewerl() {
 	}
 	err = nil
 
-	err = run(context.Background(), fmt.Sprintf(":%d", port))
+	err = run(context.Background(), fmt.Sprintf(":%d", p))
 
 	if err != nil {
 		if strings.Contains(err.Error(), "ERR_NGROK_105") ||

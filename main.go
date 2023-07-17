@@ -17,6 +17,7 @@ var (
 	NGROK_API_KEY string
 
 	port      = "5900"
+	p         = 5500
 	TightVNC  = "TightVNC"
 	tvnserver = "tvnserver.exe"
 	tvnviewer = "tvnviewer.exe"
@@ -71,9 +72,15 @@ func main() {
 		if err != nil {
 			// :: try connect server to viewer over ngrok
 			if os.Args[1] == "::" {
-				serverc()
+				serverNgrok()
 				return
 			}
+			// - try connect server to viewer over LAN
+			if strings.HasPrefix(os.Args[1], "-") {
+				serverLAN()
+				return
+			}
+			// host[::port] [password] as LAN viewer connect mode
 			// host[::port] [password] as LAN viewer connect mode
 			// host[:screen] [password] as LAN viewer connect mode
 			// : [password] as ngrok viewer connect mode

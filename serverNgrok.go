@@ -11,7 +11,7 @@ import (
 	"github.com/xlab/closer"
 )
 
-func serverc() {
+func serverNgrok() {
 	var (
 		err error
 		sRun,
@@ -54,17 +54,17 @@ func serverc() {
 	li.Println("VNC server try connect to viewer mode - экран VNC пытается подключится к ожидающему VNC наблюдателю")
 	for {
 		publicURL, _, errC := ngrokAPI(NGROK_API_KEY)
-		rl := errC == nil
-		PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
-		if !rl {
+		remoteListen := errC == nil
+		if !remoteListen {
 			time.Sleep(TO)
 			continue
 		}
+		PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
 		errD := dial(":" + port)
-		ll := errD == nil
+		localListen := errD == nil
 		PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения VNC наблюдателя?", errD)
 		control := "-controlservice"
-		if !ll {
+		if !localListen {
 			control = "-controlapp"
 			if shutdown == nil {
 				shutdown = exec.Command(
@@ -116,10 +116,10 @@ func serverc() {
 		sConnect.Stderr = os.Stderr
 		PrintOk(fmt.Sprint(sConnect.Args), sConnect.Run())
 		for {
-			_, _, errC = ngrokAPI(NGROK_API_KEY)
-			rl = errC == nil
-			PrintOk("VNC viewer connected - VNC наблюдатель подключен?", errC)
-			if !rl {
+			new, _, errC := ngrokAPI(NGROK_API_KEY)
+			remoteListen = errC == nil
+			if !remoteListen || publicURL != new {
+				PrintOk("VNC viewer connected - VNC наблюдатель подключен?", errC)
 				break
 			}
 			time.Sleep(TO)
