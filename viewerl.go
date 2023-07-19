@@ -14,6 +14,8 @@ import (
 )
 
 func viewerl() {
+	ltf.Println("viewerl", os.Args)
+	li.Printf("%q [-]port\n", os.Args[0])
 	var (
 		err error
 	)
@@ -27,15 +29,21 @@ func viewerl() {
 		// pressEnter()
 	})
 
-	li.Println("VNC viewer listen mode - VNC наблюдатель ожидает подключения экрана VNC")
-	li.Println(os.Args[0], "port")
-	li.Println(os.Args)
-
 	// -port as LAN viewer listen mode
 	// port as ngrok viewer listen mode
 	// 0  as 5500
 	if len(os.Args) > 1 {
 		i, _ := strconv.Atoi(abs(os.Args[1]))
+		if strings.HasPrefix(os.Args[1], "-") {
+			li.Println("The VNC viewer is waiting for the VNC server to be connected via LAN - наблюдатель VNC ожидает подключения VNC экрана через LAN")
+			li.Println("\tTo view via LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
+			li.Println("\t`ngrokVNC -host`")
+		} else {
+			li.Println("This will create a ngrok tunnel - это создаст туннель")
+			li.Println("The VNC viewer is waiting for the VNC server to connect via ngrok tunnel - наблюдатель VNC ожидает подключения VNC экрана через туннель")
+			li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
+			li.Println("\t`ngrokVNC`")
+		}
 		if i < p {
 			p += i
 		} else {
@@ -43,7 +51,9 @@ func viewerl() {
 		}
 	}
 
-	li.Println("port", p)
+	port := fmt.Sprintf(":%d", p)
+	li.Println("port", port)
+
 	// значение port появляется в поле `Accept Reverse connections on TCP port` на форме `TightVNC Viewer Configuration` но пока не кликнешь OK слушающий порт будет 5500
 	key := `SOFTWARE\TightVNC\Viewer\Settings`
 	k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.QUERY_VALUE|registry.SET_VALUE)
@@ -77,23 +87,23 @@ func viewerl() {
 	time.Sleep(time.Second)
 
 	if NGROK_AUTHTOKEN == "" {
-		planB(Errorf("empty NGROK_AUTHTOKEN"))
+		planB(Errorf("empty NGROK_AUTHTOKEN"), port)
 		return
 	}
 
 	_, forwardsTo, err := ngrokAPI(NGROK_API_KEY)
 	if err == nil {
-		planB(Errorf("found online client: %s", forwardsTo))
+		planB(Errorf("found online client: %s", forwardsTo), port)
 		return
 	}
 	err = nil
 
-	err = run(context.Background(), fmt.Sprintf(":%d", p))
+	err = run(context.Background(), port)
 
 	if err != nil {
 		if strings.Contains(err.Error(), "ERR_NGROK_105") ||
 			strings.Contains(err.Error(), "failed to dial ngrok server") {
-			planB(err)
+			planB(err, port)
 			err = nil
 		}
 	}

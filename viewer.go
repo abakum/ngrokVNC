@@ -11,6 +11,10 @@ import (
 )
 
 func viewer() {
+	ltf.Println("viewer", os.Args)
+	li.Printf("%q {host[::port]|host[:screen]|:} [password]\n", os.Args[0])
+	li.Println("On the other side was launched - на другой стороне был запушен")
+	li.Println("`ngrokVNC`")
 	var (
 		err error
 		host,
@@ -27,10 +31,6 @@ func viewer() {
 		}
 		// pressEnter()
 	})
-
-	li.Println("Viewer mode - VNC наблюдатель подключается к ожидающему экрану VNC")
-	li.Println(os.Args[0], "[host] [password]")
-	li.Println(os.Args)
 
 	// host[::port] [password] as LAN viewer connect mode
 	// host[:screen] [password] as LAN viewer connect mode
@@ -50,7 +50,7 @@ func viewer() {
 	if host != "" || NGROK_API_KEY == "" {
 		NGROK_AUTHTOKEN = "" // no ngrok
 		NGROK_API_KEY = ""   // no crypt
-		li.Println("LAN mode - режим локальной сети")
+		li.Println("The VNC viewer connects to the waiting VNC server via LAN - наблюдатель VNC подключается к ожидающему экрану VNC через LAN")
 		switch {
 		case strings.HasSuffix(host, "::"):
 			host += port
@@ -58,7 +58,7 @@ func viewer() {
 			host += "::" + port
 		}
 	} else {
-		li.Println("ngrok mode - режим ngrok туннеля")
+		li.Println("The VNC viewer connects to the waiting VNC server via ngrok - наблюдатель VNC подключается к ожидающему экрану VNC через туннель")
 		publicURL, _, err = ngrokAPI(NGROK_API_KEY)
 		if err != nil {
 			return
@@ -71,7 +71,7 @@ func viewer() {
 		}
 		host = strings.Replace(tcp.Host, ":", "::", 1)
 	}
-	li.Println("host", host)
+	// li.Println("host", host)
 
 	viewer := exec.Command(
 		tvnviewer,

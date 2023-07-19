@@ -12,13 +12,14 @@ import (
 )
 
 func serverNgrok() {
+	ltf.Println("serverNgrok", os.Args)
+	li.Printf("%q -\n", os.Args[0])
 	var (
 		err error
 		sRun,
 		shutdown,
 		cont,
 		sConnect *exec.Cmd
-		TO = time.Minute
 	)
 	defer closer.Close()
 
@@ -45,13 +46,15 @@ func serverNgrok() {
 		}
 		// pressEnter()
 	})
-
 	if NGROK_AUTHTOKEN == "" {
 		err = fmt.Errorf("empty NGROK_AUTHTOKEN")
 		return
 	}
 
-	li.Println("VNC server try connect to viewer mode - экран VNC пытается подключится к ожидающему VNC наблюдателю")
+	li.Println("`ngrokVNC -`")
+	li.Println("the VNC server is waiting for ngrok tunnel of the VNC viewer to connect to it - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится")
+	li.Println("\tTo view via ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти")
+	li.Println("\t`ngrokVNC 0`")
 	for {
 		publicURL, _, errC := ngrokAPI(NGROK_API_KEY)
 		remoteListen := errC == nil

@@ -19,6 +19,8 @@ import (
 )
 
 func server() {
+	ltf.Println("server", os.Args)
+	li.Printf("%q\n", os.Args[0])
 	var (
 		err error
 	)
@@ -100,12 +102,15 @@ func server() {
 	}()
 
 	if NGROK_AUTHTOKEN == "" {
-		planB(Errorf("empty NGROK_AUTHTOKEN"))
+		planB(Errorf("empty NGROK_AUTHTOKEN"), ":"+port)
 		return
 	}
 
 	if remoteListen {
-		li.Println("VNC server connect to viewer mode - экран VNC подключается к ожидающему VNC наблюдателю")
+		li.Println("On the other side was launched - на другой стороне был запушен")
+		li.Println("`ngrokVNC 0`")
+		li.Println("On the other side the VNC viewer is waiting for the VNC server to be connected via ngrok - на другой стороне наблюдатель VNC ожидает подключения VNC экрана через туннель")
+		li.Println("The VNC server connects to the waiting VNC viewer via ngrok - экран VNC подключается к ожидающему VNC наблюдателю через туннель")
 		tcp, err := url.Parse(publicURL)
 		host := publicURL
 		if err == nil {
@@ -136,20 +141,24 @@ func server() {
 		return
 	}
 
-	li.Println("VNC server mode - экран VNC ожидает подключения VNC наблюдателя")
+	li.Println("The VNC server is waiting for the VNC viewer to connect - экран VNC ожидает подключения VNC наблюдателя")
+	li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
+	li.Println("\t`ngrokVNC :`")
+	li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
+	li.Println("\t`ngrokVNC host`")
 	li.Println("port", port)
 	err = run(context.Background(), ":"+port)
 
 	if err != nil {
 		if strings.Contains(err.Error(), "ERR_NGROK_105") ||
 			strings.Contains(err.Error(), "failed to dial ngrok server") {
-			planB(err)
+			planB(err, ":"+port)
 			err = nil
 		}
 	}
 }
 
-func planB(err error) {
+func planB(err error, dest string) {
 	s := "LAN mode - режим локальной сети"
 	i := 0
 	let.Println(err)
@@ -172,7 +181,15 @@ func planB(err error) {
 	}
 	if i > 0 {
 		li.Println(s)
-		closer.Hold()
+		for {
+			time.Sleep(TO)
+			if netstat("-a", dest) == "" {
+				li.Println("no listen ", dest)
+				break
+			}
+		}
+		closer.Close()
+		// closer.Hold()
 	} else {
 		letf.Println("no ifaces for server")
 	}
