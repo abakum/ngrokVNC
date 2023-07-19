@@ -12,6 +12,6 @@
 - This VNC viewer listen mode over LAN - наблюдатель VNC ожидает подключения VNC экрана через LAN
 - - To view over LAN on the other side, run - для просмотра через LAN на другой стороне запусти<br>`ngrokVNC -host`
 
-- Run - запусти<br>`ngrokVNC ::`
+- Run - запусти<br>`ngrokVNC -`
 - This VNC server connect mode over ngrok - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится
 - - To view over ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти<br>`ngrokVNC 0`
