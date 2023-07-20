@@ -21,6 +21,36 @@ import (
 func server() {
 	ltf.Println("server", os.Args)
 	li.Printf("%q\n", os.Args[0])
+	// li.Println("Run - запусти")
+	// li.Println("`ngrokVNC`")
+	// li.Println("When there is no ngrok tunnel it will be created  - когда ngrok туннеля нет он создатся")
+	// li.Println("The VNC server is waiting for the VNC viewer to connect - экран VNC ожидает подключения VNC наблюдателя")
+	// li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
+	// li.Println("\t`ngrokVNC :`")
+	// li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
+	// li.Println("\t`ngrokVNC host`")
+	// li.Println()
+	li.Println("Run - запусти")
+	li.Println("`ngrokVNC 0`")
+	li.Println("This will create a ngrok tunnel - это создаст туннель")
+	li.Println("The VNC viewer is waiting for the VNC server to connect via ngrok tunnel - наблюдатель VNC ожидает подключения VNC экрана через туннель")
+	li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
+	li.Println("\t`ngrokVNC`")
+	li.Println()
+	li.Println("Run - запусти")
+	li.Println("`ngrokVNC -0`")
+	li.Println("The VNC viewer is waiting for the VNC server to be connected via LAN - наблюдатель VNC ожидает подключения VNC экрана через LAN")
+	li.Println("\tTo view via LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
+	li.Println("\t`ngrokVNC -host`")
+	li.Println()
+	li.Println("Run - запусти")
+	li.Println("`ngrokVNC -`")
+	li.Println("the VNC server is waiting for ngrok tunnel of the VNC viewer to connect to it - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится")
+	li.Println("\tTo view via ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти")
+	li.Println("\t`ngrokVNC 0`")
+	li.Println("`ngrokVNC -` unlike `ngrokVNC` does not stop working when the connection is broken")
+	li.Println("`ngrokVNC -` в отличии от `ngrokVNC` не прекращает работу при разрыве соедеинения")
+
 	var (
 		err error
 	)
@@ -142,11 +172,11 @@ func server() {
 	}
 
 	li.Println("The VNC server is waiting for the VNC viewer to connect - экран VNC ожидает подключения VNC наблюдателя")
+	li.Println("\ton TCP port", port)
 	li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
 	li.Println("\t`ngrokVNC :`")
 	li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
 	li.Println("\t`ngrokVNC host`")
-	li.Println("port", port)
 	err = run(context.Background(), ":"+port)
 
 	if err != nil {
@@ -188,7 +218,7 @@ func planB(err error, dest string) {
 				break
 			}
 		}
-		closer.Close()
+		// closer.Close()
 		// closer.Hold()
 	} else {
 		letf.Println("no ifaces for server")
@@ -249,7 +279,11 @@ func run(ctx context.Context, dest string) error {
 		ltf.Println("accepted connection from", conn.RemoteAddr())
 
 		go PrintOk("connection closed:", handleConn(ctx, dest, conn))
-		go handleConn(ctx, dest, conn)
+		// go handleConn(ctx, dest, conn)
+		if netstat("-a", dest) == "" {
+			li.Println("no listen ", dest)
+			break
+		}
 	}
 }
 
