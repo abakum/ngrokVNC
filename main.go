@@ -55,22 +55,22 @@ func main() {
 	if len(os.Args) > 1 {
 		_, err := strconv.Atoi(os.Args[1])
 		if err != nil {
-			// - try connect server to viewer over ngrok (revers)
-			if os.Args[1] == "-" {
+			switch {
+			case os.Args[1] == "-":
+				// - try connect server to viewer over ngrok (revers)
 				serverNgrok()
-				return
-			}
-			// -host try connect server to viewer over LAN (revers)
-			if strings.HasPrefix(os.Args[1], "-") {
+			case strings.HasPrefix(os.Args[1], "-"):
 				serverLAN()
-				return
+			case strings.HasPrefix(os.Args[1], "::"):
+				// :: as ::5900
+				server()
+			default:
+				// host[::port] [password] as LAN viewer connect mode
+				// host[:screen] [password] as LAN viewer connect mode
+				// : [password] as ngrok viewer connect mode
+				// host as host:0 as host::5900
+				viewer()
 			}
-			// host[::port] [password] as LAN viewer connect mode
-			// host[::port] [password] as LAN viewer connect mode
-			// host[:screen] [password] as LAN viewer connect mode
-			// : [password] as ngrok viewer connect mode
-			// host as host:0 as host::5900
-			viewer()
 			return
 		}
 		// -port as LAN viewer listen mode
@@ -79,6 +79,7 @@ func main() {
 		viewerl()
 		return
 	}
+	// as GUI or reg RfbPort
 	server()
 }
 

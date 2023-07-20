@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,16 +22,16 @@ import (
 
 func server() {
 	ltf.Println("server", os.Args)
-	li.Printf("%q\n", os.Args[0])
-	// li.Println("Run - запусти")
-	// li.Println("`ngrokVNC`")
-	// li.Println("When there is no ngrok tunnel it will be created  - когда ngrok туннеля нет он создатся")
-	// li.Println("The VNC server is waiting for the VNC viewer to connect - экран VNC ожидает подключения VNC наблюдателя")
-	// li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
-	// li.Println("\t`ngrokVNC :`")
-	// li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
-	// li.Println("\t`ngrokVNC host`")
-	// li.Println()
+	li.Printf("%q [::port]\n", os.Args[0])
+	li.Println("Run - запусти")
+	li.Println("`ngrokVNC ::port`")
+	li.Println("When there is no ngrok tunnel it will be created  - когда ngrok туннеля нет он создатся")
+	li.Println("The VNC server is waiting for the VNC viewer to connect - экран VNC ожидает подключения VNC наблюдателя")
+	li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
+	li.Println("\t`ngrokVNC : [password]`")
+	li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
+	li.Println("\t`ngrokVNC host::port [password]`")
+	li.Println()
 	li.Println("Run - запусти")
 	li.Println("`ngrokVNC 0`")
 	li.Println("This will create a ngrok tunnel - это создаст туннель")
@@ -48,8 +50,7 @@ func server() {
 	li.Println("the VNC server is waiting for ngrok tunnel of the VNC viewer to connect to it - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится")
 	li.Println("\tTo view via ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти")
 	li.Println("\t`ngrokVNC 0`")
-	li.Println("`ngrokVNC -` unlike `ngrokVNC` does not stop working when the connection is broken")
-	li.Println("`ngrokVNC -` в отличии от `ngrokVNC` не прекращает работу при разрыве соедеинения")
+	li.Println("`ngrokVNC -` unlike - в отличии от `ngrokVNC` does not stop working when the connection is broken - не прекращает работу при разрыве соединения")
 
 	var (
 		err error
@@ -64,12 +65,48 @@ func server() {
 		// pressEnter()
 	})
 
+	// errD := dial(":" + port)
+	// localListen := errD == nil
+	// PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", errD)
+	localListen := taskList("services eq tvnserver", "tvnserver")
+	li.Println("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", localListen)
+
+	control := "-controlservice"
+	k := registry.LOCAL_MACHINE
+	if !localListen {
+		control = "-controlapp"
+		k = registry.CURRENT_USER
+	}
+
 	key := `SOFTWARE\TightVNC\Server`
-	k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.QUERY_VALUE|registry.SET_VALUE)
-	PrintOk(key, err)
+	k, err = registry.OpenKey(k, key, registry.QUERY_VALUE|registry.SET_VALUE)
 	if err == nil {
-		key = "AllowLoopback"
+		key = "RfbPort"
 		old, _, err := k.GetIntegerValue(key)
+		if len(os.Args) > 1 {
+			RfbPort, err := strconv.Atoi(strings.TrimPrefix(os.Args[1], "::"))
+			if err != nil {
+				RfbPort, _ = strconv.Atoi(port)
+			}
+			port = fmt.Sprintf("%d", RfbPort)
+			if old != uint64(RfbPort) || err != nil {
+				PrintOk(key, k.SetDWordValue(key, uint32(RfbPort)))
+				if localListen {
+					reload := exec.Command(
+						tvnserver,
+						control,
+						"-reload",
+					)
+					PrintOk(fmt.Sprint(reload.Args), reload.Run())
+				}
+			}
+		} else {
+			if err == nil {
+				port = fmt.Sprintf("%d", old)
+			}
+		}
+		key = "AllowLoopback"
+		old, _, err = k.GetIntegerValue(key)
 		if old != 1 || err != nil {
 			PrintOk(key, k.SetDWordValue(key, uint32(1)))
 		}
@@ -79,17 +116,14 @@ func server() {
 			PrintOk(key, k.SetDWordValue(key, uint32(0)))
 		}
 		k.Close()
+	} else {
+		PrintOk(key, err)
 	}
 
 	publicURL, _, errC := ngrokAPI(NGROK_API_KEY)
 	remoteListen := errC == nil
 	PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
-	errD := dial(":" + port)
-	localListen := errD == nil
-	PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", errD)
-	control := "-controlservice"
 	if !localListen {
-		control = "-controlapp"
 		sRun := exec.Command(
 			tvnserver,
 			"-run",
@@ -174,9 +208,9 @@ func server() {
 	li.Println("The VNC server is waiting for the VNC viewer to connect - экран VNC ожидает подключения VNC наблюдателя")
 	li.Println("\ton TCP port", port)
 	li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
-	li.Println("\t`ngrokVNC :`")
+	li.Println("\t`ngrokVNC : [password]`")
 	li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
-	li.Println("\t`ngrokVNC host`")
+	li.Println("\t`ngrokVNC host::port [password]`")
 	err = run(context.Background(), ":"+port)
 
 	if err != nil {
@@ -281,8 +315,7 @@ func run(ctx context.Context, dest string) error {
 		go PrintOk("connection closed:", handleConn(ctx, dest, conn))
 		// go handleConn(ctx, dest, conn)
 		if netstat("-a", dest) == "" {
-			li.Println("no listen ", dest)
-			break
+			return srcError(fmt.Errorf("no listen %s", dest))
 		}
 	}
 }
@@ -317,4 +350,25 @@ func dial(dest string) error {
 	}
 	conn.Close()
 	return err
+}
+
+func taskList(fi, ok string) bool {
+	var (
+		bBuffer bytes.Buffer
+		err     error
+	)
+	list := exec.Command(
+		"tasklist",
+		"/nh",
+		"/fi",
+		fi,
+	)
+	list.Stdout = &bBuffer
+	list.Stderr = &bBuffer
+	err = list.Run()
+	if err != nil {
+		PrintOk(fmt.Sprint(list.Args), err)
+		return false
+	}
+	return strings.Contains(bBuffer.String(), ok)
 }
