@@ -1,5 +1,14 @@
 # ngrokVNC
-## Usage
+
+## Credits - благодарности:
+
+- GlavSoft - for [TightVNC](https://www.tightvnc.com)
+- ngrok - for [ngrok](https://github.com/ngrok/ngrok-go)
+
+## Usage - использование:
+
+- git clone https://github.com/abakum/ngrokVNC
+- place - размести `NGROK_AUTHTOKEN.txt` and - и `NGROK_API_KEY.txt` to - в `ngrokVNC` before - перед `go build .` or set env during run - или установи переменные окружения во время запуска `ngrokVNC`
 - Run - запусти<br>`ngrokVNC`
 - When there is no ngrok tunnel it will be created  - когда ngrok туннеля нет он создатся
 - The VNC server is waiting for the VNC viewer to connect - экран VNC ожидает подключения VNC наблюдателя
@@ -18,3 +27,6 @@
 - Run - запусти<br>`ngrokVNC -`
 - the VNC server is waiting for ngrok tunnel of the VNC viewer to connect to it - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится
 - - To view over ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти<br>`ngrokVNC 0`
+- `ngrokVNC -` unlike - в отличии от `ngrokVNC` does not stop working when the connection is broken - не прекращает работу при разрыве соединения
+
+
