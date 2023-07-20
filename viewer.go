@@ -46,19 +46,19 @@ func viewer() {
 	if len(os.Args) > 2 {
 		pass = "-password=" + os.Args[2]
 	}
-
+	via := []string{"LAN", "LAN"}
 	if host != "" || NGROK_API_KEY == "" {
 		NGROK_AUTHTOKEN = "" // no ngrok
 		NGROK_API_KEY = ""   // no crypt
-		li.Println("The VNC viewer connects to the waiting VNC server via LAN - наблюдатель VNC подключается к ожидающему экрану VNC через LAN")
 		switch {
 		case strings.HasSuffix(host, "::"):
 			host += port
+		case strings.Contains(host, ":"):
 		case !strings.Contains(host, "::"):
 			host += "::" + port
 		}
 	} else {
-		li.Println("The VNC viewer connects to the waiting VNC server via ngrok - наблюдатель VNC подключается к ожидающему экрану VNC через туннель")
+		via = []string{"ngrok", "туннель"}
 		publicURL, _, err = ngrokAPI(NGROK_API_KEY)
 		if err != nil {
 			return
@@ -71,7 +71,7 @@ func viewer() {
 		}
 		host = strings.Replace(tcp.Host, ":", "::", 1)
 	}
-	// li.Println("host", host)
+	li.Printf("The VNC viewer connects to the waiting VNC server via %s - наблюдатель VNC подключается к ожидающему экрану VNC через %s\n", via[0], via[1])
 
 	viewer := exec.Command(
 		tvnviewer,

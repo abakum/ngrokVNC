@@ -34,8 +34,14 @@ func viewerl() {
 	// 0  as 5500
 	if len(os.Args) > 1 {
 		i, _ := strconv.Atoi(abs(os.Args[1]))
+		if i < p {
+			p += i
+		} else {
+			p = i
+		}
 		if strings.HasPrefix(os.Args[1], "-") {
 			li.Println("The VNC viewer is waiting for the VNC server to be connected via LAN - наблюдатель VNC ожидает подключения VNC экрана через LAN")
+			li.Println("\ton TCP port", p)
 			li.Println("\tTo view via LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
 			li.Println("\t`ngrokVNC -host`")
 		} else {
@@ -44,15 +50,9 @@ func viewerl() {
 			li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
 			li.Println("\t`ngrokVNC`")
 		}
-		if i < p {
-			p += i
-		} else {
-			p = i
-		}
 	}
 
 	port := fmt.Sprintf(":%d", p)
-	li.Println("port", port)
 
 	// значение port появляется в поле `Accept Reverse connections on TCP port` на форме `TightVNC Viewer Configuration` но пока не кликнешь OK слушающий порт будет 5500
 	key := `SOFTWARE\TightVNC\Viewer\Settings`
