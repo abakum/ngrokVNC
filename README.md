@@ -29,7 +29,6 @@
 - Run - запусти<br>`ngrokVNC -`
 - the VNC server is waiting for ngrok tunnel of the VNC viewer to connect to it - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится
 - - To view over ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти<br>`ngrokVNC 0`
-- `ngrokVNC -` unlike `ngrokVNC` does not stop working when the connection is broken"
-- `ngrokVNC -` в отличии от `ngrokVNC` не прекращает работу при разрыве соедеинения"
+- `ngrokVNC -` unlike - в отличии от `ngrokVNC` does not stop working when the connection is broken - не прекращает работу при разрыве соедеинения
 
 
