@@ -58,9 +58,10 @@ func main() {
 		if err != nil {
 			switch {
 			case os.Args[1] == "-":
-				// - try connect server to viewer over ngrok (revers)
+				// - try connect server to viewer via ngrok (revers)
 				serverNgrok()
 			case strings.HasPrefix(os.Args[1], "-"):
+				// - try connect server to viewer via LAN (revers)
 				serverLAN()
 			case strings.HasPrefix(os.Args[1], "::"):
 				// :: as ::5900
