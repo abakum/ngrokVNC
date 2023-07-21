@@ -18,7 +18,7 @@
 - Run - запусти<br>`ngrokVNC 0`
 - This will create a ngrok tunnel - это создаст туннель
 - The VNC viewer is waiting for the VNC server to connect via ngrok tunnel - наблюдатель VNC ожидает подключения VNC экрана через тоннель
-- - To view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти<br>`ngrokVNC`
+- - To view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти<br>`ngrokVNC [::port]`
     
 - Run - запусти<br>`ngrokVNC -0`
 - The VNC viewer is waiting for the VNC server to be connected via LAN - наблюдатель VNC ожидает подключения VNC экрана через LAN
@@ -27,6 +27,5 @@
 - Run - запусти<br>`ngrokVNC -`
 - the VNC server is waiting for ngrok tunnel of the VNC viewer to connect to it - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится
 - - To view over ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти<br>`ngrokVNC 0`
-- `ngrokVNC -` unlike - в отличии от `ngrokVNC` does not stop working when the connection is broken - не прекращает работу при разрыве соединения
 
 
