@@ -13,8 +13,8 @@ import (
 func viewer() {
 	ltf.Println("viewer", os.Args)
 	li.Printf("%q {host[::port]|host[:screen]|:} [password]\n", os.Args[0])
-	li.Println("On the other side was launched - на другой стороне был запушен")
-	li.Println("`ngrokVNC`")
+	li.Println("On the other side should be running - на другой стороне должен быть запущен")
+	li.Println("`ngrokVNC [::port]`")
 	var (
 		err error
 		host,
@@ -52,10 +52,10 @@ func viewer() {
 		NGROK_API_KEY = ""   // no crypt
 		switch {
 		case strings.HasSuffix(host, "::"):
-			host += port
+			host += portRFB
 		case strings.Contains(host, ":"):
 		case !strings.Contains(host, "::"):
-			host += "::" + port
+			host += "::" + portRFB
 		}
 	} else {
 		via = []string{"ngrok", "туннель"}

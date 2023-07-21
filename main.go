@@ -17,12 +17,13 @@ var (
 	//go:embed NGROK_API_KEY.txt
 	NGROK_API_KEY string
 
-	TO        = time.Second * 10
-	port      = "5900"
-	p         = 5500
-	TightVNC  = "TightVNC"
-	tvnserver = "tvnserver.exe"
-	tvnviewer = "tvnviewer.exe"
+	TO                   = time.Second * 10
+	portRFB              = "5900"
+	portViewer           = 5500
+	TightVNC             = "TightVNC"
+	tvnserver            = "tvnserver.exe"
+	tvnviewer            = "tvnviewer.exe"
+	AcceptRfbConnections = true
 )
 
 func main() {

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strconv"
@@ -21,7 +22,7 @@ func serverLAN() {
 		shutdown,
 		cont,
 		sConnect *exec.Cmd
-		ps = fmt.Sprintf("%d", p)
+		ps = fmt.Sprintf("%d", portViewer)
 		host,
 		ESTABLISHED,
 		new string
@@ -69,9 +70,9 @@ func serverLAN() {
 		parts := strings.Split(host, ":")
 		i, err := strconv.Atoi(parts[1])
 		if err == nil {
-			i += p
+			i += portViewer
 		} else {
-			i = p
+			i = portViewer
 		}
 		host = fmt.Sprintf("%s::%d", parts[0], i)
 	}
@@ -90,9 +91,8 @@ func serverLAN() {
 			continue
 		}
 		PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
-		errD := dial(":" + port)
-		localListen := errD == nil
-		PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения VNC наблюдателя?", errD)
+		localListen := strings.Contains(taskList("services eq tvnserver"), "tvnserver")
+		li.Println("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", localListen)
 		control := "-controlservice"
 		if !localListen {
 			control = "-controlapp"
@@ -193,4 +193,12 @@ func netstat(a, host string) (contains string) {
 			return
 		}
 	}
+}
+func dial(dest string) error {
+	conn, err := net.Dial("tcp", dest)
+	if err != nil {
+		return srcError(err)
+	}
+	conn.Close()
+	return err
 }

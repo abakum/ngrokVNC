@@ -63,9 +63,8 @@ func serverNgrok() {
 			continue
 		}
 		PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
-		errD := dial(":" + port)
-		localListen := errD == nil
-		PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения VNC наблюдателя?", errD)
+		localListen := strings.Contains(taskList("services eq tvnserver"), "tvnserver")
+		li.Println("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", localListen)
 		control := "-controlservice"
 		if !localListen {
 			control = "-controlapp"
