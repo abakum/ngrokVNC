@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"os"
@@ -22,7 +21,6 @@ func serverLAN() {
 		shutdown,
 		cont,
 		sConnect *exec.Cmd
-		ps = fmt.Sprintf("%d", portViewer)
 		host,
 		ESTABLISHED,
 		new string
@@ -59,23 +57,7 @@ func serverLAN() {
 			host = ""
 		}
 	}
-	switch {
-	case strings.HasSuffix(host, "::"):
-		host += ps
-	case !strings.Contains(host, "::"):
-		host += "::" + ps
-	case strings.HasSuffix(host, ":"):
-		host += "::" + ps
-	case strings.Contains(host, ":"):
-		parts := strings.Split(host, ":")
-		i, err := strconv.Atoi(parts[1])
-		if err == nil {
-			i += portViewer
-		} else {
-			i = portViewer
-		}
-		host = fmt.Sprintf("%s::%d", parts[0], i)
-	}
+	host = hp(host, strconv.Itoa(portViewer))
 	hostD := strings.Replace(host, "::", ":", 1)
 	li.Println("host", host)
 
@@ -98,14 +80,14 @@ func serverLAN() {
 			control = "-controlapp"
 			if shutdown == nil {
 				shutdown = exec.Command(
-					tvnserver,
+					serverExe,
 					control,
 					"-shutdown",
 				)
 			}
 			if sRun == nil {
 				sRun = exec.Command(
-					tvnserver,
+					serverExe,
 					"-run",
 				)
 				sRun.Stdout = os.Stdout
@@ -120,7 +102,7 @@ func serverLAN() {
 
 		if cont == nil {
 			cont = exec.Command(
-				tvnserver,
+				serverExe,
 				control,
 			)
 			cont.Stdout = os.Stdout
@@ -132,7 +114,7 @@ func serverLAN() {
 			}()
 		}
 		sConnect = exec.Command(
-			tvnserver,
+			serverExe,
 			control,
 			"-connect",
 			host,
@@ -141,9 +123,9 @@ func serverLAN() {
 		sConnect.Stderr = os.Stderr
 		PrintOk(fmt.Sprint(sConnect.Args), sConnect.Run())
 		time.Sleep(time.Second)
-		ESTABLISHED = netstat("", hostD)
+		ESTABLISHED = netstat("", hostD, "")
 		for {
-			new = netstat("", hostD)
+			new = netstat("", hostD, "")
 			if new == "" || new != ESTABLISHED {
 				li.Println("VNC viewer connected - VNC наблюдатель подключен? no")
 				break
@@ -157,43 +139,6 @@ func serverLAN() {
 	}
 }
 
-func netstat(a, host string) (contains string) {
-	var (
-		bBuffer bytes.Buffer
-		err     error
-	)
-	ok := "LISTENING"
-	if a == "" {
-		ok = "ESTABLISHED"
-		a = "-o"
-	}
-	stat := exec.Command(
-		"netstat",
-		"-n",
-		"-p",
-		"TCP",
-		"-o",
-		a,
-	)
-	stat.Stdout = &bBuffer
-	stat.Stderr = &bBuffer
-	err = stat.Run()
-	if err != nil {
-		PrintOk(fmt.Sprint(stat.Args), err)
-		return ""
-	}
-
-	for {
-		contains, err = bBuffer.ReadString('\n')
-		if err != nil {
-			return ""
-		}
-		if strings.Contains(contains, host) && strings.Contains(contains, ok) {
-			// ltf.Println(contains)
-			return
-		}
-	}
-}
 func dial(dest string) error {
 	conn, err := net.Dial("tcp", dest)
 	if err != nil {
@@ -201,4 +146,25 @@ func dial(dest string) error {
 	}
 	conn.Close()
 	return err
+}
+
+func hp(host, ps string) string {
+	switch {
+	case strings.HasSuffix(host, "::"):
+		host += ps
+	case strings.Contains(host, "::"):
+	case strings.HasSuffix(host, ":"):
+		host += ":" + ps
+	case strings.Contains(host, ":"):
+		p, _ := strconv.Atoi(ps)
+		parts := strings.Split(host, ":")
+		i, err := strconv.Atoi(parts[1])
+		if err == nil {
+			i += p
+		} else {
+			i = p
+		}
+		host = fmt.Sprintf("%s::%d", parts[0], i)
+	}
+	return host
 }

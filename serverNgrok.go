@@ -70,14 +70,14 @@ func serverNgrok() {
 			control = "-controlapp"
 			if shutdown == nil {
 				shutdown = exec.Command(
-					tvnserver,
+					serverExe,
 					control,
 					"-shutdown",
 				)
 			}
 			if sRun == nil {
 				sRun = exec.Command(
-					tvnserver,
+					serverExe,
 					"-run",
 				)
 				sRun.Stdout = os.Stdout
@@ -92,7 +92,7 @@ func serverNgrok() {
 
 		if cont == nil {
 			cont = exec.Command(
-				tvnserver,
+				serverExe,
 				control,
 			)
 			cont.Stdout = os.Stdout
@@ -109,7 +109,7 @@ func serverNgrok() {
 			host = strings.Replace(tcp.Host, ":", "::", 1)
 		}
 		sConnect = exec.Command(
-			tvnserver,
+			serverExe,
 			control,
 			"-connect",
 			host,

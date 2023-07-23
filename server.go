@@ -41,6 +41,7 @@ func server() {
 	// localListen := errD == nil
 	// PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", errD)
 	localListen := strings.Contains(taskList("services eq tvnserver"), "tvnserver")
+
 	li.Println("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", localListen)
 
 	control := "-controlservice"
@@ -66,7 +67,7 @@ func server() {
 				PrintOk(key, k.SetDWordValue(key, uint32(RfbPort)))
 				if localListen {
 					reload := exec.Command(
-						tvnserver,
+						serverExe,
 						control,
 						"-reload",
 					)
@@ -81,7 +82,7 @@ func server() {
 			li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
 			li.Println("\t`ngrokVNC : [password]`")
 			li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
-			li.Println("\t`ngrokVNC host::port [password]`")
+			li.Println("\t`ngrokVNC host[::port] [password]`")
 			li.Println()
 			li.Println("Run - запусти")
 			li.Println("`ngrokVNC 0`")
@@ -104,17 +105,16 @@ func server() {
 			if err == nil {
 				portRFB = fmt.Sprintf("%d", old)
 			}
+			parts := strings.Split(taskList("services eq repeater_service"), " ")
+			if len(parts) > 16 {
+				proxy = true
+				pid := parts[16]
+				pref := "  TCP    0.0.0.0:59"
+				portRFB = "59" + strings.Split(strings.TrimPrefix(netstat("-a", pref, pid), pref), " ")[0]
+			}
 		}
-		key = "AllowLoopback"
-		old, _, err = k.GetIntegerValue(key)
-		if old != 1 || err != nil {
-			PrintOk(key, k.SetDWordValue(key, uint32(1)))
-		}
-		key = "LoopbackOnly"
-		old, _, err = k.GetIntegerValue(key)
-		if old != 0 || err != nil {
-			PrintOk(key, k.SetDWordValue(key, uint32(0)))
-		}
+		SetDWordValue(k, "AllowLoopback", 1)
+		SetDWordValue(k, "LoopbackOnly", 0)
 		k.Close()
 	} else {
 		PrintOk(key, err)
@@ -125,7 +125,7 @@ func server() {
 	PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
 	if !localListen {
 		sRun := exec.Command(
-			tvnserver,
+			serverExe,
 			"-run",
 		)
 		sRun.Stdout = os.Stdout
@@ -133,7 +133,7 @@ func server() {
 		closer.Bind(func() {
 			if sRun.Process != nil && sRun.ProcessState == nil {
 				shutdown := exec.Command(
-					tvnserver,
+					serverExe,
 					control,
 					"-shutdown",
 				)
@@ -149,7 +149,7 @@ func server() {
 	}
 
 	cont := exec.Command(
-		tvnserver,
+		serverExe,
 		control,
 	)
 	cont.Stdout = os.Stdout
@@ -181,7 +181,7 @@ func server() {
 			host = strings.Replace(tcp.Host, ":", "::", 1)
 		}
 		sConnect := exec.Command(
-			tvnserver,
+			serverExe,
 			control,
 			"-connect",
 			host,
@@ -192,7 +192,7 @@ func server() {
 			closer.Bind(func() {
 				if sConnect.Process != nil && sConnect.ProcessState == nil {
 					shutdown := exec.Command(
-						tvnserver,
+						serverExe,
 						control,
 						"-shutdown",
 					)
@@ -204,14 +204,21 @@ func server() {
 		closer.Hold()
 		return
 	}
-
-	if AcceptRfbConnections {
+	switch {
+	case proxy:
+		li.Println("The UltraVNC proxy is waiting for the UltraVNC viewer to connect -  UltraVNC прокси ожидает подключения UltraVNC наблюдателя")
+		li.Println("\ton TCP port", portRFB)
+		li.Println("\tTo view via ngrok~proxy~LAN on the other side, run - для просмотра через туннель~прокси~LAN на другой стороне запусти")
+		li.Println("\t`ngrokVNC :host[::port] [password]`")
+	case AcceptRfbConnections:
 		li.Println("The VNC server is waiting for the VNC viewer to connect - экран VNC ожидает подключения VNC наблюдателя")
 		li.Println("\ton TCP port", portRFB)
 		li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
 		li.Println("\t`ngrokVNC : [password]`")
 		li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
 		li.Println("\t`ngrokVNC host[::port] [password]`")
+	}
+	if AcceptRfbConnections {
 		err = run(context.Background(), ":"+portRFB, false)
 	}
 
@@ -253,7 +260,7 @@ func planB(err error, dest string) {
 		li.Println(s)
 		for {
 			time.Sleep(TO)
-			if netstat("-a", dest) == "" {
+			if netstat("-a", dest, "") == "" {
 				li.Println("no listen ", dest)
 				break
 			}
@@ -323,7 +330,7 @@ func run(ctx context.Context, dest string, http bool) error {
 
 		go PrintOk("connection closed:", handleConn(ctx, dest, conn))
 		// go handleConn(ctx, dest, conn)
-		if netstat("-a", dest) == "" {
+		if netstat("-a", dest, "") == "" {
 			return srcError(fmt.Errorf("no listen %s", dest))
 		}
 	}
@@ -378,4 +385,49 @@ func GetBoolValue(k registry.Key, key string) bool {
 		return val == 1
 	}
 	return false
+}
+
+func SetDWordValue(k registry.Key, key string, val int) {
+	old, _, err := k.GetIntegerValue(key)
+	if old != uint64(val) || err != nil {
+		PrintOk(key, k.SetDWordValue(key, uint32(val)))
+	}
+}
+
+func netstat(a, host, pid string) (contains string) {
+	var (
+		bBuffer bytes.Buffer
+		err     error
+	)
+	ok := "LISTENING"
+	if a == "" {
+		ok = "ESTABLISHED"
+		a = "-o"
+	}
+	stat := exec.Command(
+		"netstat",
+		"-n",
+		"-p",
+		"TCP",
+		"-o",
+		a,
+	)
+	stat.Stdout = &bBuffer
+	stat.Stderr = &bBuffer
+	err = stat.Run()
+	if err != nil {
+		PrintOk(fmt.Sprint(stat.Args), err)
+		return ""
+	}
+
+	for {
+		contains, err = bBuffer.ReadString('\n')
+		if err != nil {
+			return ""
+		}
+		if strings.Contains(contains, host) && strings.Contains(contains, ok) && strings.Contains(contains, pid) {
+			// ltf.Println(contains)
+			return
+		}
+	}
 }

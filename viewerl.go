@@ -33,17 +33,19 @@ func viewerl() {
 	// port as ngrok viewer listen mode
 	// 0  as 5500
 	if len(os.Args) > 1 {
-		i, _ := strconv.Atoi(abs(os.Args[1]))
-		if i < portViewer {
-			portViewer += i
-		} else {
-			portViewer = i
+		i, err := strconv.Atoi(abs(os.Args[1]))
+		if err == nil {
+			if i < portViewer {
+				portViewer += i
+			} else {
+				portViewer = i
+			}
 		}
 		if strings.HasPrefix(os.Args[1], "-") {
 			li.Println("The VNC viewer is waiting for the VNC server to be connected via LAN - наблюдатель VNC ожидает подключения VNC экрана через LAN")
 			li.Println("\ton TCP port", portViewer)
 			li.Println("\tTo view via LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
-			li.Println("\t`ngrokVNC -host`")
+			li.Println("\t`ngrokVNC -host[::port]`")
 		} else {
 			li.Println("This will create a ngrok tunnel - это создаст туннель")
 			li.Println("The VNC viewer is waiting for the VNC server to connect via ngrok tunnel - наблюдатель VNC ожидает подключения VNC экрана через туннель")
@@ -52,26 +54,25 @@ func viewerl() {
 		}
 	}
 
-	port := fmt.Sprintf(":%d", portViewer)
+	arg := []string{"-listen"}
+	port := strconv.Itoa(portViewer)
 
-	// значение port появляется в поле `Accept Reverse connections on TCP port` на форме `TightVNC Viewer Configuration` но пока не кликнешь OK слушающий порт будет 5500
-	key := `SOFTWARE\TightVNC\Viewer\Settings`
-	k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.QUERY_VALUE|registry.SET_VALUE)
-	PrintOk(key, err)
-	if err == nil {
-		key = "ListenPort"
-		old, _, err := k.GetIntegerValue(key)
-		if old != uint64(portViewer) || err != nil {
-			PrintOk(key, k.SetDWordValue(key, uint32(portViewer)))
+	switch VNC["name"] {
+	case "TightVNC":
+		// значение port появляется в поле `Accept Reverse connections on TCP port` на форме `TightVNC Viewer Configuration` но пока не кликнешь OK слушающий порт будет 5500
+		key := `SOFTWARE\TightVNC\Viewer\Settings`
+		k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.QUERY_VALUE|registry.SET_VALUE)
+		if err == nil {
+			SetDWordValue(k, "ListenPort", portViewer)
+			k.Close()
+		} else {
+			PrintOk(key, err)
 		}
-		k.Close()
+	case "UltraVNC":
+		arg = append(arg, port)
 	}
 
-	cmd := "-listen"
-	viewer := exec.Command(
-		tvnviewer,
-		cmd,
-	)
+	viewer := exec.Command(viewerExe, arg...)
 	viewer.Stdout = os.Stdout
 	viewer.Stderr = os.Stderr
 	closer.Bind(func() {
@@ -86,6 +87,7 @@ func viewerl() {
 	}()
 	time.Sleep(time.Second)
 
+	port = ":" + port
 	if NGROK_AUTHTOKEN == "" {
 		planB(Errorf("empty NGROK_AUTHTOKEN"), port)
 		return
