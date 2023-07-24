@@ -63,21 +63,18 @@ func serverNgrok() {
 			continue
 		}
 		PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
-		localListen := strings.Contains(taskList("services eq tvnserver"), "tvnserver")
-		li.Println("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", localListen)
-		control := "-controlservice"
+		ll()
+		arg := []string{}
+		if VNC["name"] == "TightVNC" {
+			arg = append(arg, control)
+		}
+
 		if !localListen {
-			control = "-controlapp"
 			if shutdown == nil {
-				shutdown = exec.Command(
-					serverExe,
-					control,
-					"-shutdown",
-				)
+				shutdown = exec.Command(serverExe, append(arg, VNC["kill"])...)
 			}
 			if sRun == nil {
-				sRun = exec.Command(
-					serverExe,
+				sRun = exec.Command(serverExe,
 					"-run",
 				)
 				sRun.Stdout = os.Stdout
@@ -91,29 +88,26 @@ func serverNgrok() {
 		}
 
 		if cont == nil {
-			cont = exec.Command(
-				serverExe,
-				control,
-			)
-			cont.Stdout = os.Stdout
-			cont.Stderr = os.Stderr
-			go func() {
-				li.Println(cont.Args)
-				PrintOk(fmt.Sprint("Closed ", cont.Args), cont.Run())
-				closer.Close()
-			}()
+			if VNC["name"] == "TightVNC" {
+				cont = exec.Command(serverExe, arg...)
+				cont.Stdout = os.Stdout
+				cont.Stderr = os.Stderr
+				go func() {
+					li.Println(cont.Args)
+					PrintOk(fmt.Sprint("Closed ", cont.Args), cont.Run())
+					closer.Close()
+				}()
+			}
 		}
 		tcp, err := url.Parse(publicURL)
 		host := publicURL
 		if err == nil {
 			host = strings.Replace(tcp.Host, ":", "::", 1)
 		}
-		sConnect = exec.Command(
-			serverExe,
-			control,
+		sConnect := exec.Command(serverExe, append(arg,
 			"-connect",
 			host,
-		)
+		)...)
 		sConnect.Stdout = os.Stdout
 		sConnect.Stderr = os.Stderr
 		PrintOk(fmt.Sprint(sConnect.Args), sConnect.Run())

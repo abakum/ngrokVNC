@@ -21,13 +21,29 @@ var (
 	portRFB    = "5900"
 	portViewer = 5500
 	VNC        = map[string]string{"name": ""}
-	TightVNC   = map[string]string{"name": "TightVNC", "server": "tvnserver.exe", "viewer": "tvnviewer.exe", "path": ""}
-	UltraVNC   = map[string]string{"name": "UltraVNC", "server": "winvnc.exe", "viewer": "vncviewer.exe", "path": "", "repeater": "repeater.exe"}
-	VNCs       = []map[string]string{TightVNC, UltraVNC}
+	TightVNC   = map[string]string{
+		"name":     "TightVNC",
+		"server":   "tvnserver.exe",
+		"viewer":   "tvnviewer.exe",
+		"path":     "",
+		"services": "tvnserver",
+		"kill":     "-shutdown",
+	}
+	UltraVNC = map[string]string{
+		"name":     "UltraVNC",
+		"server":   "winvnc.exe",
+		"viewer":   "vncviewer.exe",
+		"path":     "",
+		"services": "uvnc_service",
+		"kill":     "-kill",
+	}
+	VNCs = []map[string]string{TightVNC, UltraVNC}
 	serverExe,
-	viewerExe string
+	viewerExe,
+	control string
 	AcceptRfbConnections = true
-	proxy                bool
+	proxy, localListen   bool
+	k                    registry.Key
 )
 
 func main() {
@@ -121,4 +137,33 @@ func abs(s string) string {
 		return strings.TrimPrefix(s, "-")
 	}
 	return s
+}
+func usage() {
+	li.Println("Run - запусти")
+	li.Println("`ngrokVNC [::port]`")
+	li.Println("When there is no ngrok tunnel it will be created  - когда ngrok туннеля нет он создатся")
+	li.Println("The VNC server is waiting for the VNC viewer to connect - экран VNC ожидает подключения VNC наблюдателя")
+	li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
+	li.Println("\t`ngrokVNC : [password]`")
+	li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
+	li.Println("\t`ngrokVNC host[::port] [password]`")
+	li.Println()
+	li.Println("Run - запусти")
+	li.Println("`ngrokVNC 0`")
+	li.Println("This will create a ngrok tunnel - это создаст туннель")
+	li.Println("The VNC viewer is waiting for the VNC server to connect via ngrok tunnel - наблюдатель VNC ожидает подключения VNC экрана через туннель")
+	li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
+	li.Println("\t`ngrokVNC`")
+	li.Println()
+	li.Println("Run - запусти")
+	li.Println("`ngrokVNC -0`")
+	li.Println("The VNC viewer is waiting for the VNC server to be connected via LAN - наблюдатель VNC ожидает подключения VNC экрана через LAN")
+	li.Println("\tTo view via LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
+	li.Println("\t`ngrokVNC -host`")
+	li.Println()
+	li.Println("Run - запусти")
+	li.Println("`ngrokVNC -`")
+	li.Println("the VNC server is waiting for ngrok tunnel of the VNC viewer to connect to it - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится")
+	li.Println("\tTo view via ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти")
+	li.Println("\t`ngrokVNC 0`")
 }

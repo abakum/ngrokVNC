@@ -64,7 +64,7 @@ func serverLAN() {
 	li.Println("On the other side was launched - на другой стороне был запушен")
 	li.Println("`ngrokVNC -0`")
 	li.Println("On the other side the VNC viewer is waiting for the VNC server to be connected via LAN - на другой стороне наблюдатель VNC ожидает подключения VNC экрана через LAN")
-	li.Println("The VNC server connects to the waiting VNC viewer via LAN - экран VNC подключается к ожидающему VNC наблюдателю через туннель")
+	li.Println("The VNC server connects to the waiting VNC viewer via LAN - экран VNC подключается к ожидающему VNC наблюдателю через LAN")
 	for {
 		errC := dial(hostD)
 		remoteListen := errC == nil
@@ -73,21 +73,18 @@ func serverLAN() {
 			continue
 		}
 		PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
-		localListen := strings.Contains(taskList("services eq tvnserver"), "tvnserver")
-		li.Println("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", localListen)
-		control := "-controlservice"
+		ll()
+		arg := []string{}
+		if VNC["name"] == "TightVNC" {
+			arg = append(arg, control)
+		}
+
 		if !localListen {
-			control = "-controlapp"
 			if shutdown == nil {
-				shutdown = exec.Command(
-					serverExe,
-					control,
-					"-shutdown",
-				)
+				shutdown = exec.Command(serverExe, append(arg, VNC["kill"])...)
 			}
 			if sRun == nil {
-				sRun = exec.Command(
-					serverExe,
+				sRun = exec.Command(serverExe,
 					"-run",
 				)
 				sRun.Stdout = os.Stdout
@@ -101,24 +98,21 @@ func serverLAN() {
 		}
 
 		if cont == nil {
-			cont = exec.Command(
-				serverExe,
-				control,
-			)
-			cont.Stdout = os.Stdout
-			cont.Stderr = os.Stderr
-			go func() {
-				li.Println(cont.Args)
-				PrintOk(fmt.Sprint("Closed ", cont.Args), cont.Run())
-				closer.Close()
-			}()
+			if VNC["name"] == "TightVNC" {
+				cont = exec.Command(serverExe, arg...)
+				cont.Stdout = os.Stdout
+				cont.Stderr = os.Stderr
+				go func() {
+					li.Println(cont.Args)
+					PrintOk(fmt.Sprint("Closed ", cont.Args), cont.Run())
+					closer.Close()
+				}()
+			}
 		}
-		sConnect = exec.Command(
-			serverExe,
-			control,
+		sConnect := exec.Command(serverExe, append(arg,
 			"-connect",
 			host,
-		)
+		)...)
 		sConnect.Stdout = os.Stdout
 		sConnect.Stderr = os.Stderr
 		PrintOk(fmt.Sprint(sConnect.Args), sConnect.Run())
@@ -165,6 +159,8 @@ func hp(host, ps string) string {
 			i = p
 		}
 		host = fmt.Sprintf("%s::%d", parts[0], i)
+	default:
+		host += "::" + ps
 	}
 	return host
 }
