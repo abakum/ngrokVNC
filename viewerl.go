@@ -68,24 +68,28 @@ func viewerl() {
 		} else {
 			PrintOk(key, err)
 		}
-	case "UltraVNC":
+	default:
 		arg = append(arg, port)
 	}
 
-	viewer := exec.Command(viewerExe, arg...)
-	viewer.Stdout = os.Stdout
-	viewer.Stderr = os.Stderr
-	closer.Bind(func() {
-		if viewer.Process != nil && viewer.ProcessState == nil {
-			PrintOk(fmt.Sprint("Kill ", viewer.Args), viewer.Process.Kill())
-		}
-	})
-	go func() {
-		li.Println(viewer.Args)
-		PrintOk(fmt.Sprint("Closed ", viewer.Args), viewer.Run())
-		closer.Close()
-	}()
-	time.Sleep(time.Second)
+	if p55xx() != portViewer {
+		viewer := exec.Command(viewerExe, arg...)
+		viewer.Stdout = os.Stdout
+		viewer.Stderr = os.Stderr
+		closer.Bind(func() {
+			if viewer.Process != nil && viewer.ProcessState == nil {
+				PrintOk(fmt.Sprint("Kill ", viewer.Args), viewer.Process.Kill())
+			}
+		})
+		go func() {
+			li.Println(viewer.Args)
+			PrintOk(fmt.Sprint("Closed ", viewer.Args), viewer.Run())
+			if VNC["name"] != "TurboVNC" {
+				closer.Close()
+			}
+		}()
+		time.Sleep(time.Second)
+	}
 
 	port = ":" + port
 	if NGROK_AUTHTOKEN == "" {
@@ -109,4 +113,30 @@ func viewerl() {
 			err = nil
 		}
 	}
+}
+
+func p55xx() (i int) {
+	pref := "  TCP    0.0.0.0:55"
+	ok := netstat("-a", pref, "")
+	if ok == "" {
+		return 0
+	}
+	parts := strings.Split(strings.TrimPrefix(ok, pref), " ")
+	i, err := strconv.Atoi("55" + parts[0])
+	if err != nil {
+		return
+	}
+	if i > 5599 {
+		return i
+	}
+	li.Println("listen", i)
+	return i
+}
+
+func trimDubleSpace(s string) (trim string) {
+	trim = s
+	for strings.Contains(trim, "  ") {
+		trim = strings.ReplaceAll(trim, "  ", " ")
+	}
+	return
 }

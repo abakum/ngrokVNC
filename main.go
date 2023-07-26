@@ -37,7 +37,23 @@ var (
 		"services": "uvnc_service",
 		"kill":     "-kill",
 	}
-	VNCs = []map[string]string{TightVNC, UltraVNC}
+	TurboVNC = map[string]string{
+		"name":     "TurboVNC",
+		"server":   "",
+		"viewer":   "vncviewerw.bat",
+		"path":     "",
+		"services": "",
+		"kill":     "-kill",
+	}
+	RealVNC = map[string]string{
+		"name":     "RealVNC",
+		"server":   "",
+		"viewer":   "vncviewer.exe",
+		"path":     "",
+		"services": "",
+		"kill":     "",
+	}
+	VNCs = []map[string]string{TightVNC, UltraVNC, TurboVNC, RealVNC}
 	serverExe,
 	viewerExe,
 	control string
@@ -82,8 +98,8 @@ func main() {
 	} else {
 		PrintOk(key, err)
 	}
-	if VNC["name"] == "" {
-		letf.Println("not found vnc")
+	if VNC["path"] == "" {
+		letf.Println("not found VNC viewer")
 		return
 	}
 	li.Println(VNC["name"], VNC["path"])

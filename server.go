@@ -87,8 +87,8 @@ func server() {
 	case "UltraVNC":
 		AcceptRfbConnections = true
 	}
-	p59(VNC["services"])
-	p59("repeater_service")
+	p59xx(VNC["services"])
+	p59xx("repeater_service")
 
 	publicURL, _, errC := ngrokAPI(NGROK_API_KEY)
 	remoteListen := errC == nil
@@ -215,17 +215,19 @@ func planB(err error, dest string) {
 	}
 	if i > 0 {
 		li.Println(s)
-		for {
-			time.Sleep(TO)
-			if netstat("-a", dest, "") == "" {
-				li.Println("no listen ", dest)
-				break
-			}
-		}
-		// closer.Close()
-		// closer.Hold()
+		watch(dest)
 	} else {
 		letf.Println("no ifaces for server")
+	}
+}
+
+func watch(dest string) {
+	for {
+		time.Sleep(TO)
+		if netstat("-a", dest, "") == "" {
+			li.Println("no listen ", dest)
+			break
+		}
 	}
 }
 
@@ -276,8 +278,15 @@ func run(ctx context.Context, dest string, http bool) error {
 	}
 
 	ltf.Println("tunnel created:", tun.URL())
+	go func() {
+		watch(dest)
+		closer.Close()
+	}()
 
 	for {
+		if netstat("-a", dest, "") == "" {
+			return srcError(fmt.Errorf("no listen %s", dest))
+		}
 		conn, err := tun.Accept()
 		if err != nil {
 			return srcError(err)
@@ -287,9 +296,6 @@ func run(ctx context.Context, dest string, http bool) error {
 
 		go PrintOk("connection closed:", handleConn(ctx, dest, conn))
 		// go handleConn(ctx, dest, conn)
-		if netstat("-a", dest, "") == "" {
-			return srcError(fmt.Errorf("no listen %s", dest))
-		}
 	}
 }
 
@@ -382,28 +388,42 @@ func netstat(a, host, pid string) (contains string) {
 		if err != nil {
 			return ""
 		}
-		if strings.Contains(contains, host) && strings.Contains(contains, ok) && strings.Contains(contains, pid) {
+		if strings.Contains(contains, host) && strings.Contains(contains, ok) && strings.HasSuffix(contains, pid) {
 			// ltf.Println(contains)
 			return
 		}
 	}
 }
 
-func p59(serv string) {
-	parts := strings.Split(taskList("services eq "+serv), " ")
-	if len(parts) > 16 {
-		proxy = serv == "repeater_service"
-		pid := parts[16]
-		pref := "  TCP    0.0.0.0:59"
-		portRFB = "59" + strings.Split(strings.TrimPrefix(netstat("-a", pref, pid), pref), " ")[0]
-		ltf.Println(serv, portRFB)
+func p59xx(serv string) {
+	if serv == "" {
+		return
 	}
+	parts := strings.Split(taskList("services eq "+serv), ".exe")
+	if len(parts) < 2 {
+		return
+	}
+	pid := strings.Split(strings.TrimSpace(parts[1]), " ")[0]
+	pref := "  TCP    0.0.0.0:59"
+	i, err := strconv.Atoi("59" + strings.Split(strings.TrimPrefix(netstat("-a", pref, pid), pref), " ")[0])
+	if err != nil {
+		return
+	}
+	if i > 5999 {
+		return
+	}
+	proxy = serv == "repeater_service"
+	portRFB = strconv.Itoa(i)
+	ltf.Println(serv, portRFB)
 }
 
 func ll() {
 	control = "-controlapp"
 	k = registry.CURRENT_USER
 	for _, xVNC := range VNCs {
+		if xVNC["server"] == "" {
+			continue
+		}
 		localListen = strings.Contains(taskList("services eq "+xVNC["services"]), xVNC["server"])
 		if localListen {
 			control = "-controlservice"

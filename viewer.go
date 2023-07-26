@@ -69,7 +69,12 @@ func viewer() {
 		}
 		if proxy {
 			via = []string{"ngrok~proxy~LAN", "туннель~прокси~LAN"}
-			arg = append(arg, "-proxy")
+			switch VNC["name"] {
+			case "UltraVNC":
+				arg = append(arg, "-proxy")
+			case "TurboVNC":
+				arg = append(arg, "-via")
+			}
 		}
 		arg = append(arg, strings.Replace(tcp.Host, ":", "::", 1))
 	}
@@ -79,7 +84,8 @@ func viewer() {
 		switch VNC["name"] {
 		case "TightVNC":
 			arg = append(arg, "-password="+os.Args[2])
-		case "UltraVNC":
+		case "RealVNC":
+		default:
 			arg = append(arg, "-password")
 			arg = append(arg, os.Args[2])
 		}
