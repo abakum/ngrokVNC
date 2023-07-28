@@ -5,9 +5,11 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/xlab/closer"
+	"gopkg.in/ini.v1"
 )
 
 func viewer() {
@@ -53,7 +55,8 @@ func viewer() {
 			NGROK_AUTHTOKEN = "" // no ngrok
 			NGROK_API_KEY = ""
 		}
-		arg = append(arg, hp(host, portRFB))
+		h, _, _ := hp(host, portRFB)
+		arg = append(arg, h)
 	}
 	if proxy || !LAN {
 		via = []string{"ngrok", "туннель"}
@@ -90,7 +93,20 @@ func viewer() {
 			arg = append(arg, os.Args[2])
 		}
 	}
+	if VNC["name"] == "UltraVNC" {
+		ultravnc := filepath.Join(VNC["path"], "ultravnc.ini")
+		inidata, err := ini.Load(ultravnc)
+		if err == nil {
+			admin := inidata.Section("admin")
+			DSMPlugin := admin.Key("DSMPlugin").String()
+			if admin.Key("UseDSMPlugin").String() == "1" && DSMPlugin != "" {
+				arg = append(arg, "-dsmplugin")
+				arg = append(arg, DSMPlugin)
+			}
+		}
+	}
 	viewer := exec.Command(viewerExe, arg...)
+	viewer.Dir = filepath.Dir(viewer.Path)
 	viewer.Stdout = os.Stdout
 	viewer.Stderr = os.Stderr
 

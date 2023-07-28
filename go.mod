@@ -24,4 +24,5 @@ require (
 	golang.ngrok.com/ngrok v1.3.0
 	golang.org/x/sync v0.3.0
 	golang.org/x/sys v0.8.0
+	gopkg.in/ini.v1 v1.67.0
 )

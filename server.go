@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"golang.ngrok.com/ngrok/config"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/windows/registry"
+	"gopkg.in/ini.v1"
 )
 
 func server() {
@@ -25,7 +27,8 @@ func server() {
 	li.Printf("%q [::port]\n", os.Args[0])
 
 	var (
-		err error
+		err    error
+		reload bool
 	)
 	defer closer.Close()
 
@@ -40,6 +43,11 @@ func server() {
 	// errD := dial(":" + port)
 	// localListen := errD == nil
 	// PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", errD)
+	if len(os.Args) > 1 {
+		_, portRFB, reload = hp(os.Args[1], portRFB)
+	} else {
+		usage()
+	}
 	ll()
 
 	arg := []string{}
@@ -54,12 +62,8 @@ func server() {
 			AcceptRfbConnections = GetBoolValue(k, "AcceptRfbConnections")
 			key = "RfbPort"
 			old, _, err := k.GetIntegerValue(key)
-			if len(os.Args) > 1 {
-				RfbPort, err := strconv.Atoi(strings.TrimPrefix(os.Args[1], "::"))
-				if err != nil {
-					RfbPort, _ = strconv.Atoi(portRFB)
-				}
-				portRFB = fmt.Sprintf("%d", RfbPort)
+			if reload {
+				RfbPort, err := strconv.Atoi(portRFB)
 				if old != uint64(RfbPort) || err != nil {
 					PrintOk(key, k.SetDWordValue(key, uint32(RfbPort)))
 					if localListen {
@@ -72,11 +76,9 @@ func server() {
 					}
 				}
 			} else {
-				usage()
 				if err == nil {
 					portRFB = fmt.Sprintf("%d", old)
 				}
-				// p59("repeater")
 			}
 			SetDWordValue(k, "AllowLoopback", 1)
 			SetDWordValue(k, "LoopbackOnly", 0)
@@ -86,6 +88,28 @@ func server() {
 		}
 	case "UltraVNC":
 		AcceptRfbConnections = true
+		ini.PrettyFormat = false
+		ultravnc := filepath.Join(VNC["path"], "ultravnc.ini")
+		inidata, err := ini.LoadSources(ini.LoadOptions{
+			IgnoreInlineComment: true,
+		}, ultravnc)
+		if err == nil {
+			admin := inidata.Section("admin")
+			AcceptRfbConnections = admin.Key("SocketConnect").String() == "1"
+
+			if SetValue(admin, "PortNumber", portRFB) ||
+				SetValue(admin, "AutoPortSelect", "0") ||
+				SetValue(admin, "AllowLoopback", "1") ||
+				SetValue(admin, "LoopbackOnly", "0") ||
+				SetValue(admin, "AutoPortSelect", "0") {
+				err = inidata.SaveTo(ultravnc)
+				if err != nil {
+					letf.Println("error write", ultravnc)
+				}
+			}
+		} else {
+			letf.Println("error read", ultravnc)
+		}
 	}
 	p59xx(VNC["services"])
 	p59xx("repeater_service")
@@ -388,8 +412,7 @@ func netstat(a, host, pid string) (contains string) {
 		if err != nil {
 			return ""
 		}
-		if strings.Contains(contains, host) && strings.Contains(contains, ok) && strings.HasSuffix(contains, pid) {
-			// ltf.Println(contains)
+		if strings.Contains(contains, host) && strings.Contains(contains, ok) && strings.Contains(contains, pid) {
 			return
 		}
 	}
@@ -433,4 +456,13 @@ func ll() {
 		}
 	}
 	li.Println("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", localListen, VNC["name"])
+}
+
+func SetValue(section *ini.Section, key, val string) (set bool) {
+	set = section.Key(key).String() != val
+	if set {
+		letf.Println(key, val)
+		section.Key(key).SetValue(val)
+	}
+	return
 }

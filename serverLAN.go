@@ -57,7 +57,7 @@ func serverLAN() {
 			host = ""
 		}
 	}
-	host = hp(host, strconv.Itoa(portViewer))
+	host, _, _ = hp(host, strconv.Itoa(portViewer))
 	hostD := strings.Replace(host, "::", ":", 1)
 	li.Println("host", host)
 
@@ -142,7 +142,7 @@ func dial(dest string) error {
 	return err
 }
 
-func hp(host, ps string) string {
+func hp(host, ps string) (hostPort, port string, ok bool) {
 	switch {
 	case strings.HasSuffix(host, "::"):
 		host += ps
@@ -162,5 +162,6 @@ func hp(host, ps string) string {
 	default:
 		host += "::" + ps
 	}
-	return host
+	port = strings.Split(host, "::")[1]
+	return host, port, port != ps
 }
