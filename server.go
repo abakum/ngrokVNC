@@ -461,7 +461,7 @@ func ll() {
 func SetValue(section *ini.Section, key, val string) (set bool) {
 	set = section.Key(key).String() != val
 	if set {
-		letf.Println(key, val)
+		ltf.Println(key, val)
 		section.Key(key).SetValue(val)
 	}
 	return
