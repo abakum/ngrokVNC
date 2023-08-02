@@ -11,9 +11,9 @@ import (
 	"github.com/xlab/closer"
 )
 
-func serverNgrok() {
-	ltf.Println("serverNgrok", os.Args)
-	li.Printf("%q -\n", os.Args[0])
+func serverNgrok(args ...string) {
+	ltf.Println("serverNgrok", args)
+	li.Printf("%q -\n", args[0])
 	var (
 		err error
 		sRun,
@@ -30,18 +30,18 @@ func serverNgrok() {
 		}
 		if sRun != nil {
 			if sRun.Process != nil && sRun.ProcessState == nil && shutdown != nil {
-				PrintOk(fmt.Sprint(shutdown.Args), shutdown.Run())
+				PrintOk(cmd("Run", shutdown), shutdown.Run())
 				shutdown = nil
 			}
 		}
 		if cont != nil {
 			if cont.Process != nil && cont.ProcessState == nil {
-				PrintOk(fmt.Sprint("Kill ", cont.Args), cont.Process.Kill())
+				PrintOk(cmd("Kill", cont), cont.Process.Kill())
 			}
 		}
 		if sConnect != nil {
 			if sConnect.Process != nil && sConnect.ProcessState == nil && shutdown != nil {
-				PrintOk(fmt.Sprint(shutdown.Args), shutdown.Run())
+				PrintOk(cmd("Run", shutdown), shutdown.Run())
 			}
 		}
 		// pressEnter()
@@ -64,14 +64,14 @@ func serverNgrok() {
 		}
 		PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
 		ll()
-		arg := []string{}
+		opts := []string{}
 		if VNC["name"] == "TightVNC" {
-			arg = append(arg, control)
+			opts = append(opts, control)
 		}
 
 		if !localListen {
 			if shutdown == nil {
-				shutdown = exec.Command(serverExe, append(arg, VNC["kill"])...)
+				shutdown = exec.Command(serverExe, append(opts, VNC["kill"])...)
 			}
 			if sRun == nil {
 				sRun = exec.Command(serverExe,
@@ -80,8 +80,8 @@ func serverNgrok() {
 				sRun.Stdout = os.Stdout
 				sRun.Stderr = os.Stderr
 				go func() {
-					li.Println(sRun.Args)
-					PrintOk(fmt.Sprint("Closed ", sRun.Args), sRun.Run())
+					li.Println(cmd("Run", sRun))
+					PrintOk(cmd("Closed", sRun), sRun.Run())
 				}()
 				time.Sleep(time.Second)
 			}
@@ -89,12 +89,12 @@ func serverNgrok() {
 
 		if cont == nil {
 			if VNC["name"] == "TightVNC" {
-				cont = exec.Command(serverExe, arg...)
+				cont = exec.Command(serverExe, opts...)
 				cont.Stdout = os.Stdout
 				cont.Stderr = os.Stderr
 				go func() {
-					li.Println(cont.Args)
-					PrintOk(fmt.Sprint("Closed ", cont.Args), cont.Run())
+					li.Println(cmd("Run", cont))
+					PrintOk(cmd("Closed", cont), cont.Run())
 					closer.Close()
 				}()
 			}
@@ -104,13 +104,13 @@ func serverNgrok() {
 		if err == nil {
 			host = strings.Replace(tcp.Host, ":", "::", 1)
 		}
-		sConnect := exec.Command(serverExe, append(arg,
+		sConnect := exec.Command(serverExe, append(opts,
 			"-connect",
 			host,
 		)...)
 		sConnect.Stdout = os.Stdout
 		sConnect.Stderr = os.Stderr
-		PrintOk(fmt.Sprint(sConnect.Args), sConnect.Run())
+		PrintOk(cmd("Run", sConnect), sConnect.Run())
 		for {
 			new, _, errC := ngrokAPI(NGROK_API_KEY)
 			remoteListen = errC == nil
@@ -121,7 +121,7 @@ func serverNgrok() {
 			time.Sleep(TO)
 		}
 		if shutdown != nil {
-			PrintOk(fmt.Sprint(shutdown.Args), shutdown.Run())
+			PrintOk(cmd("Run", shutdown), shutdown.Run())
 			shutdown = nil
 		}
 	}

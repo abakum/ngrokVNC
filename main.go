@@ -17,7 +17,7 @@ var (
 	//go:embed NGROK_API_KEY.txt
 	NGROK_API_KEY string
 
-	TO         = time.Second * 10
+	TO         = time.Second * 60
 	portRFB    = "5900"
 	portViewer = 5500
 	VNC        = map[string]string{"name": ""}
@@ -112,38 +112,43 @@ func main() {
 	NGROK_API_KEY = Getenv("NGROK_API_KEY", NGROK_API_KEY)
 	// NGROK_API_KEY = ""
 
-	if len(os.Args) > 1 {
-		_, err := strconv.Atoi(os.Args[1])
+	args := os.Args[:]
+	for k, v := range args {
+		args[k] = strings.ReplaceAll(v, ";", ":")
+	}
+
+	if len(args) > 1 {
+		_, err := strconv.Atoi(args[1])
 		if err != nil {
 			switch {
-			case os.Args[1] == "-":
+			case args[1] == "-":
 				// - try connect server to viewer via ngrok (revers)
-				serverNgrok()
-			case strings.HasPrefix(os.Args[1], "-"):
+				serverNgrok(args...)
+			case strings.HasPrefix(args[1], "-"):
 				// - try connect server to viewer via LAN (revers)
-				serverLAN()
-			case strings.HasPrefix(os.Args[1], "::"):
+				serverLAN(args...)
+			case strings.HasPrefix(args[1], "::"):
 				// :: as ::5900
-				server()
+				server(args...)
 			default:
 				// host[::port] [password] as LAN viewer connect mode
-				// host[:screen] [password] as LAN viewer connect mode
+				// host[:display] [password] as LAN viewer connect mode
 				// :host[::port] [password] as ngrok~proxy~LAN viewer connect mode
-				// :host[:screen] [password] as ngrok~proxy~LAN viewer connect mode
+				// :host[:display] [password] as ngrok~proxy~LAN viewer connect mode
 				// : [password] as ngrok viewer connect mode
 				// host as host:0 as host: as host::5900 as host::
-				viewer()
+				viewer(args...)
 			}
 			return
 		}
 		// -port as LAN viewer listen mode
 		// port as ngrok viewer listen mode
 		// 0  as 5500
-		viewerl()
+		viewerl(args...)
 		return
 	}
 	// as GUI or reg RfbPort
-	server()
+	server(args...)
 }
 
 func abs(s string) string {

@@ -12,9 +12,9 @@ import (
 	"github.com/xlab/closer"
 )
 
-func serverLAN() {
-	ltf.Println("serverLAN", os.Args)
-	li.Printf("%q -host\n", os.Args[0])
+func serverLAN(args ...string) {
+	ltf.Println("serverLAN", args)
+	li.Printf("%q -host\n", args[0])
 	var (
 		err error
 		sRun,
@@ -34,25 +34,25 @@ func serverLAN() {
 		}
 		if sRun != nil {
 			if sRun.Process != nil && sRun.ProcessState == nil && shutdown != nil {
-				PrintOk(fmt.Sprint(shutdown.Args), shutdown.Run())
+				PrintOk(cmd("Run", shutdown), shutdown.Run())
 				shutdown = nil
 			}
 		}
 		if cont != nil {
 			if cont.Process != nil && cont.ProcessState == nil {
-				PrintOk(fmt.Sprint("Kill ", cont.Args), cont.Process.Kill())
+				PrintOk(cmd("Kill", cont), cont.Process.Kill())
 			}
 		}
 		if sConnect != nil {
 			if sConnect.Process != nil && sConnect.ProcessState == nil && shutdown != nil {
-				PrintOk(fmt.Sprint(shutdown.Args), shutdown.Run())
+				PrintOk(cmd("Run", shutdown), shutdown.Run())
 			}
 		}
 		// pressEnter()
 	})
 
-	if len(os.Args) > 1 {
-		host = abs(os.Args[1])
+	if len(args) > 1 {
+		host = abs(args[1])
 		if host == ":" {
 			host = ""
 		}
@@ -74,14 +74,14 @@ func serverLAN() {
 		}
 		PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
 		ll()
-		arg := []string{}
+		opts := []string{}
 		if VNC["name"] == "TightVNC" {
-			arg = append(arg, control)
+			opts = append(opts, control)
 		}
 
 		if !localListen {
 			if shutdown == nil {
-				shutdown = exec.Command(serverExe, append(arg, VNC["kill"])...)
+				shutdown = exec.Command(serverExe, append(opts, VNC["kill"])...)
 			}
 			if sRun == nil {
 				sRun = exec.Command(serverExe,
@@ -90,8 +90,8 @@ func serverLAN() {
 				sRun.Stdout = os.Stdout
 				sRun.Stderr = os.Stderr
 				go func() {
-					li.Println(sRun.Args)
-					PrintOk(fmt.Sprint("Closed ", sRun.Args), sRun.Run())
+					li.Println(cmd("Run", sRun))
+					PrintOk(cmd("Closed", sRun), sRun.Run())
 				}()
 				time.Sleep(time.Second)
 			}
@@ -99,23 +99,23 @@ func serverLAN() {
 
 		if cont == nil {
 			if VNC["name"] == "TightVNC" {
-				cont = exec.Command(serverExe, arg...)
+				cont = exec.Command(serverExe, opts...)
 				cont.Stdout = os.Stdout
 				cont.Stderr = os.Stderr
 				go func() {
-					li.Println(cont.Args)
-					PrintOk(fmt.Sprint("Closed ", cont.Args), cont.Run())
+					li.Println(cmd("Run", cont))
+					PrintOk(cmd("Closed", cont), cont.Run())
 					closer.Close()
 				}()
 			}
 		}
-		sConnect := exec.Command(serverExe, append(arg,
+		sConnect := exec.Command(serverExe, append(opts,
 			"-connect",
 			host,
 		)...)
 		sConnect.Stdout = os.Stdout
 		sConnect.Stderr = os.Stderr
-		PrintOk(fmt.Sprint(sConnect.Args), sConnect.Run())
+		PrintOk(cmd("Run", sConnect), sConnect.Run())
 		time.Sleep(time.Second)
 		ESTABLISHED = netstat("", hostD, "")
 		for {
@@ -127,7 +127,7 @@ func serverLAN() {
 			time.Sleep(TO)
 		}
 		if shutdown != nil {
-			PrintOk(fmt.Sprint(shutdown.Args), shutdown.Run())
+			PrintOk(cmd("Run", shutdown), shutdown.Run())
 			shutdown = nil
 		}
 	}

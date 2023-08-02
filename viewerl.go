@@ -2,20 +2,21 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/xlab/closer"
 	"golang.org/x/sys/windows/registry"
+	"gopkg.in/ini.v1"
 )
 
-func viewerl() {
-	ltf.Println("viewerl", os.Args)
-	li.Printf("%q [-]port\n", os.Args[0])
+func viewerl(args ...string) {
+	ltf.Println("viewerl", args)
+	li.Printf("%q [-]port\n", args[0])
 	var (
 		err error
 	)
@@ -32,8 +33,8 @@ func viewerl() {
 	// -port as LAN viewer listen mode
 	// port as ngrok viewer listen mode
 	// 0  as 5500
-	if len(os.Args) > 1 {
-		i, err := strconv.Atoi(abs(os.Args[1]))
+	if len(args) > 1 {
+		i, err := strconv.Atoi(abs(args[1]))
 		if err == nil {
 			if i < portViewer {
 				portViewer += i
@@ -41,11 +42,16 @@ func viewerl() {
 				portViewer = i
 			}
 		}
-		if strings.HasPrefix(os.Args[1], "-") {
+		if strings.HasPrefix(args[1], "-") {
 			li.Println("The VNC viewer is waiting for the VNC server to be connected via LAN - наблюдатель VNC ожидает подключения VNC экрана через LAN")
 			li.Println("\ton TCP port", portViewer)
 			li.Println("\tTo view via LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
-			li.Println("\t`ngrokVNC -host[::port]`")
+			if i == 0 {
+				li.Println("\t`ngrokVNC -host`")
+
+			} else {
+				li.Printf("\t`ngrokVNC -host:%d`", i)
+			}
 		} else {
 			li.Println("This will create a ngrok tunnel - это создаст туннель")
 			li.Println("The VNC viewer is waiting for the VNC server to connect via ngrok tunnel - наблюдатель VNC ожидает подключения VNC экрана через туннель")
@@ -54,7 +60,7 @@ func viewerl() {
 		}
 	}
 
-	arg := []string{"-listen"}
+	opts := []string{"-listen"}
 	port := strconv.Itoa(portViewer)
 
 	switch VNC["name"] {
@@ -68,22 +74,59 @@ func viewerl() {
 		} else {
 			PrintOk(key, err)
 		}
+	case "UltraVNC":
+		opts = append(opts, port)
+		opts = append(opts, "-noToolBar")
+		ultravnc := filepath.Join(VNC["path"], "ultravnc.ini")
+		ini.PrettyFormat = false
+		iniFile, err := ini.Load(ultravnc)
+		DSMPlugin := ""
+		UseDSMPlugin := "0"
+		if err == nil {
+			section := iniFile.Section("admin")
+			DSMPlugin = section.Key("DSMPlugin").String()
+			if section.Key("UseDSMPlugin").String() == "1" && DSMPlugin != "" {
+				UseDSMPlugin = "1"
+				opts = append(opts, "-DSMPlugin")
+				opts = append(opts, DSMPlugin)
+			}
+		} else {
+			letf.Println("error read", ultravnc)
+		}
+		ultravnc = filepath.Join(VNC["path"], "options.vnc")
+		iniFile, err = ini.Load(ultravnc)
+		if err == nil {
+			section := iniFile.Section("options")
+			if SetValue(section, "UseDSMPlugin", UseDSMPlugin) ||
+				SetValue(section, "DSMPlugin", DSMPlugin) ||
+				SetValue(section, "RequireEncryption", UseDSMPlugin) ||
+				SetValue(section, "AllowUntrustedServers", "0") ||
+				SetValue(section, "ListenPort", port) ||
+				SetValue(section, "showtoolbar", "0") {
+				err = iniFile.SaveTo(ultravnc)
+				if err != nil {
+					letf.Println("error write", ultravnc)
+				}
+			}
+		} else {
+			letf.Println("error read", ultravnc)
+		}
 	default:
-		arg = append(arg, port)
+		opts = append(opts, port)
 	}
 
-	if p55xx() != portViewer {
-		viewer := exec.Command(viewerExe, arg...)
+	if p550x() != portViewer {
+		viewer := exec.Command(viewerExe, opts...)
 		viewer.Stdout = os.Stdout
 		viewer.Stderr = os.Stderr
 		closer.Bind(func() {
 			if viewer.Process != nil && viewer.ProcessState == nil {
-				PrintOk(fmt.Sprint("Kill ", viewer.Args), viewer.Process.Kill())
+				PrintOk(cmd("Kill", viewer), viewer.Process.Kill())
 			}
 		})
 		go func() {
-			li.Println(viewer.Args)
-			PrintOk(fmt.Sprint("Closed ", viewer.Args), viewer.Run())
+			li.Println(cmd("Run", viewer))
+			PrintOk(cmd("Closed", viewer), viewer.Run())
 			if VNC["name"] != "TurboVNC" {
 				closer.Close()
 			}
@@ -115,25 +158,25 @@ func viewerl() {
 	}
 }
 
-func p55xx() (i int) {
-	pref := "  TCP    0.0.0.0:55"
+func p550x() (i int) {
+	pref := "  TCP    0.0.0.0:550"
 	ok := netstat("-a", pref, "")
 	if ok == "" {
 		return 0
 	}
 	parts := strings.Split(strings.TrimPrefix(ok, pref), " ")
-	i, err := strconv.Atoi("55" + parts[0])
+	i, err := strconv.Atoi("550" + parts[0])
 	if err != nil {
 		return
 	}
 	if i > 5599 {
 		return i
 	}
-	li.Println("listen", i)
+	ltf.Println("listen", i, ok)
 	return i
 }
 
-func trimDubleSpace(s string) (trim string) {
+func replaceSpaceSpace(s string) (trim string) {
 	trim = s
 	for strings.Contains(trim, "  ") {
 		trim = strings.ReplaceAll(trim, "  ", " ")

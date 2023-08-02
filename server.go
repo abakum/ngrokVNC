@@ -22,9 +22,9 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-func server() {
-	ltf.Println("server", os.Args)
-	li.Printf("%q [::port]\n", os.Args[0])
+func server(args ...string) {
+	ltf.Println("server", args)
+	li.Printf("%q [::port]\n", args[0])
 
 	var (
 		err    error
@@ -43,18 +43,18 @@ func server() {
 	// errD := dial(":" + port)
 	// localListen := errD == nil
 	// PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", errD)
-	if len(os.Args) > 1 {
-		_, portRFB, reload = hp(os.Args[1], portRFB)
+	if len(args) > 1 {
+		_, portRFB, reload = hp(args[1], portRFB)
 	} else {
 		usage()
 	}
 	ll()
 
-	arg := []string{}
+	opts := []string{}
 
 	switch VNC["name"] {
 	case "TightVNC":
-		arg = append(arg, control)
+		opts = append(opts, control)
 
 		key := `SOFTWARE\TightVNC\Server`
 		k, err = registry.OpenKey(k, key, registry.QUERY_VALUE|registry.SET_VALUE)
@@ -72,7 +72,7 @@ func server() {
 							control,
 							"-reload",
 						)
-						PrintOk(fmt.Sprint(reload.Args), reload.Run())
+						PrintOk(cmd("Run", reload), reload.Run())
 					}
 				}
 			} else {
@@ -90,19 +90,18 @@ func server() {
 		AcceptRfbConnections = true
 		ini.PrettyFormat = false
 		ultravnc := filepath.Join(VNC["path"], "ultravnc.ini")
-		inidata, err := ini.LoadSources(ini.LoadOptions{
+		iniFile, err := ini.LoadSources(ini.LoadOptions{
 			IgnoreInlineComment: true,
 		}, ultravnc)
 		if err == nil {
-			admin := inidata.Section("admin")
-			AcceptRfbConnections = admin.Key("SocketConnect").String() == "1"
+			section := iniFile.Section("admin")
+			AcceptRfbConnections = section.Key("SocketConnect").String() == "1"
 
-			if SetValue(admin, "PortNumber", portRFB) ||
-				SetValue(admin, "AutoPortSelect", "0") ||
-				SetValue(admin, "AllowLoopback", "1") ||
-				SetValue(admin, "LoopbackOnly", "0") ||
-				SetValue(admin, "AutoPortSelect", "0") {
-				err = inidata.SaveTo(ultravnc)
+			if SetValue(section, "PortNumber", portRFB) ||
+				SetValue(section, "AutoPortSelect", "0") ||
+				SetValue(section, "AllowLoopback", "1") ||
+				SetValue(section, "LoopbackOnly", "0") {
+				err = iniFile.SaveTo(ultravnc)
 				if err != nil {
 					letf.Println("error write", ultravnc)
 				}
@@ -111,8 +110,8 @@ func server() {
 			letf.Println("error read", ultravnc)
 		}
 	}
-	p59xx(VNC["services"])
-	p59xx("repeater_service")
+	p590x(VNC["services"])
+	p590x("repeater_service")
 
 	publicURL, _, errC := ngrokAPI(NGROK_API_KEY)
 	remoteListen := errC == nil
@@ -125,29 +124,29 @@ func server() {
 		sRun.Stderr = os.Stderr
 		closer.Bind(func() {
 			if sRun.Process != nil && sRun.ProcessState == nil {
-				shutdown := exec.Command(serverExe, append(arg, VNC["kill"])...)
-				PrintOk(fmt.Sprint(shutdown.Args), shutdown.Run())
+				shutdown := exec.Command(serverExe, append(opts, VNC["kill"])...)
+				PrintOk(cmd("Run", shutdown), shutdown.Run())
 			}
 		})
 		go func() {
-			li.Println(sRun.Args)
-			PrintOk(fmt.Sprint("Closed ", sRun.Args), sRun.Run())
+			li.Println(cmd("Run", sRun))
+			PrintOk(cmd("Closed", sRun), sRun.Run())
 			closer.Close()
 		}()
 		time.Sleep(time.Second)
 	}
 	if VNC["name"] == "TightVNC" {
-		cont := exec.Command(serverExe, arg...)
+		cont := exec.Command(serverExe, opts...)
 		cont.Stdout = os.Stdout
 		cont.Stderr = os.Stderr
 		closer.Bind(func() {
 			if cont.Process != nil && cont.ProcessState == nil {
-				PrintOk(fmt.Sprint("Kill ", cont.Args), cont.Process.Kill())
+				PrintOk(cmd("Kill", cont), cont.Process.Kill())
 			}
 		})
 		go func() {
-			li.Println(cont.Args)
-			PrintOk(fmt.Sprint("Closed ", cont.Args), cont.Run())
+			li.Println(cmd("Run", cont))
+			PrintOk(cmd("Closed", cont), cont.Run())
 			closer.Close()
 		}()
 	}
@@ -167,7 +166,7 @@ func server() {
 		if err == nil {
 			host = strings.Replace(tcp.Host, ":", "::", 1)
 		}
-		sConnect := exec.Command(serverExe, append(arg,
+		sConnect := exec.Command(serverExe, append(opts,
 			"-connect",
 			host,
 		)...)
@@ -176,12 +175,12 @@ func server() {
 		if !localListen {
 			closer.Bind(func() {
 				if sConnect.Process != nil && sConnect.ProcessState == nil {
-					shutdown := exec.Command(serverExe, append(arg, VNC["kill"])...)
-					PrintOk(fmt.Sprint(shutdown.Args), shutdown.Run())
+					shutdown := exec.Command(serverExe, append(opts, VNC["kill"])...)
+					PrintOk(cmd("Run", shutdown), shutdown.Run())
 				}
 			})
 		}
-		PrintOk(fmt.Sprint(sConnect.Args), sConnect.Run())
+		PrintOk(cmd("Run", sConnect), sConnect.Run())
 		closer.Hold()
 		return
 	}
@@ -360,7 +359,7 @@ func taskList(fi string) string {
 	list.Stderr = &bBuffer
 	err := list.Run()
 	if err != nil {
-		PrintOk(fmt.Sprint(list.Args), err)
+		PrintOk(cmd("Run", list), err)
 		return ""
 	}
 	return bBuffer.String()
@@ -403,7 +402,7 @@ func netstat(a, host, pid string) (contains string) {
 	stat.Stderr = &bBuffer
 	err = stat.Run()
 	if err != nil {
-		PrintOk(fmt.Sprint(stat.Args), err)
+		PrintOk(cmd("Run", stat), err)
 		return ""
 	}
 
@@ -418,7 +417,7 @@ func netstat(a, host, pid string) (contains string) {
 	}
 }
 
-func p59xx(serv string) {
+func p590x(serv string) {
 	if serv == "" {
 		return
 	}
@@ -427,8 +426,12 @@ func p59xx(serv string) {
 		return
 	}
 	pid := strings.Split(strings.TrimSpace(parts[1]), " ")[0]
-	pref := "  TCP    0.0.0.0:59"
-	i, err := strconv.Atoi("59" + strings.Split(strings.TrimPrefix(netstat("-a", pref, pid), pref), " ")[0])
+	pref := "  TCP    0.0.0.0:590"
+	suffix := strings.Split(strings.TrimPrefix(netstat("-a", pref, pid), pref), " ")[0]
+	if suffix == "" {
+		return
+	}
+	i, err := strconv.Atoi("590" + suffix)
 	if err != nil {
 		return
 	}
