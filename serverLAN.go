@@ -14,7 +14,7 @@ import (
 
 func serverLAN(args ...string) {
 	ltf.Println("serverLAN", args)
-	li.Printf("%q -host\n", args[0])
+	li.Printf(`"%s" -host\n`, args[0])
 	var (
 		err error
 		sRun,
@@ -66,13 +66,13 @@ func serverLAN(args ...string) {
 	li.Println("On the other side the VNC viewer is waiting for the VNC server to be connected via LAN - на другой стороне наблюдатель VNC ожидает подключения VNC экрана через LAN")
 	li.Println("The VNC server connects to the waiting VNC viewer via LAN - экран VNC подключается к ожидающему VNC наблюдателю через LAN")
 	for {
-		errC := dial(hostD)
-		remoteListen := errC == nil
+		errD := dial(hostD)
+		remoteListen := errD == nil
 		if !remoteListen {
 			time.Sleep(TO)
 			continue
 		}
-		PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
+		PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errD)
 		ll()
 		opts := []string{}
 		if VNC["name"] == "TightVNC" {
@@ -144,6 +144,8 @@ func dial(dest string) error {
 
 func hp(host, ps string) (hostPort, port string, ok bool) {
 	switch {
+	case strings.EqualFold("id", host):
+		return host + ":0", ps, false
 	case strings.HasSuffix(host, "::"):
 		host += ps
 	case strings.Contains(host, "::"):
@@ -152,6 +154,9 @@ func hp(host, ps string) (hostPort, port string, ok bool) {
 	case strings.Contains(host, ":"):
 		p, _ := strconv.Atoi(ps)
 		parts := strings.Split(host, ":")
+		if strings.EqualFold("id", parts[0]) {
+			return host, ps, false
+		}
 		i, err := strconv.Atoi(parts[1])
 		if err == nil {
 			i += p
@@ -160,6 +165,10 @@ func hp(host, ps string) (hostPort, port string, ok bool) {
 		}
 		host = fmt.Sprintf("%s::%d", parts[0], i)
 	default:
+		i, err := strconv.Atoi(host)
+		if err == nil && i < 1000000000 && i > -1 {
+			return "ID:" + host, ps, false
+		}
 		host += "::" + ps
 	}
 	port = strings.Split(host, "::")[1]

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/exec"
@@ -24,11 +25,12 @@ import (
 
 func server(args ...string) {
 	ltf.Println("server", args)
-	li.Printf("%q [::port]\n", args[0])
+	li.Printf(`"%s" {+[id]|[::port]}\n`, args[0])
 
 	var (
-		err    error
-		reload bool
+		err      error
+		reload   bool
+		ultravnc string
 	)
 	defer closer.Close()
 
@@ -40,14 +42,13 @@ func server(args ...string) {
 		// pressEnter()
 	})
 
-	// errD := dial(":" + port)
-	// localListen := errD == nil
-	// PrintOk("Is VNC service listen - экран VNC как сервис ожидает подключения наблюдателя?", errD)
 	if len(args) > 1 {
 		_, portRFB, reload = hp(args[1], portRFB)
 	} else {
-		usage()
+		reload = portRFB != CportRFB
+		portRFB = CportRFB
 	}
+	letf.Println("reload", reload, portRFB)
 	ll()
 
 	opts := []string{}
@@ -73,6 +74,7 @@ func server(args ...string) {
 							"-reload",
 						)
 						PrintOk(cmd("Run", reload), reload.Run())
+						p5ixx("imagename", VNC["server"], 9)
 					}
 				}
 			} else {
@@ -89,7 +91,7 @@ func server(args ...string) {
 	case "UltraVNC":
 		AcceptRfbConnections = true
 		ini.PrettyFormat = false
-		ultravnc := filepath.Join(VNC["path"], "ultravnc.ini")
+		ultravnc = filepath.Join(VNC["path"], "ultravnc.ini")
 		iniFile, err := ini.LoadSources(ini.LoadOptions{
 			IgnoreInlineComment: true,
 		}, ultravnc)
@@ -110,16 +112,28 @@ func server(args ...string) {
 			letf.Println("error read", ultravnc)
 		}
 	}
-	p590x(VNC["services"])
-	p590x("repeater_service")
 
-	publicURL, _, errC := ngrokAPI(NGROK_API_KEY)
-	remoteListen := errC == nil
-	PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errC)
+	if VNC["name"] == "UltraVNC" {
+		switch {
+		case proxy2:
+			connect = fmt.Sprintf("127.0.0.1::%d", PportViewer)
+		case plus2:
+		default:
+			connect = ""
+		}
+	}
 	if !localListen {
-		sRun := exec.Command(serverExe,
+		opts := []string{}
+		if connect != "" {
+			opts = append(opts,
+				"-id:"+id,
+				"-connect",
+				connect,
+			)
+		}
+		sRun := exec.Command(serverExe, append(opts,
 			"-run",
-		)
+		)...)
 		sRun.Stdout = os.Stdout
 		sRun.Stderr = os.Stderr
 		closer.Bind(func() {
@@ -134,6 +148,43 @@ func server(args ...string) {
 			closer.Close()
 		}()
 		time.Sleep(time.Second)
+	}
+	if localListen {
+		serviceCommandLine := ""
+		if connect != "" {
+			serviceCommandLine = fmt.Sprintf("-autoreconnect ID:%s -connect %s", id, connect)
+		}
+		iniFile, err := ini.LoadSources(ini.LoadOptions{
+			IgnoreInlineComment: true,
+		}, ultravnc)
+		if err == nil {
+			section := iniFile.Section("admin")
+			if SetValue(section, "service_commandline", serviceCommandLine) || reload {
+				err = iniFile.SaveTo(ultravnc)
+				if err != nil {
+					letf.Println("error write", ultravnc)
+				} else {
+					stop := exec.Command(
+						"net",
+						"stop",
+						VNC["services"])
+					stop.Stdout = os.Stdout
+					stop.Stderr = os.Stderr
+					PrintOk(cmd("Run", stop), stop.Run())
+
+					start := exec.Command(
+						"net",
+						"start",
+						VNC["services"])
+					start.Stdout = os.Stdout
+					start.Stderr = os.Stderr
+					PrintOk(cmd("Run", start), start.Run())
+					p5ixx("imagename", VNC["server"], 9)
+				}
+			}
+		} else {
+			letf.Println("error read", ultravnc)
+		}
 	}
 	if VNC["name"] == "TightVNC" {
 		cont := exec.Command(serverExe, opts...)
@@ -156,7 +207,7 @@ func server(args ...string) {
 		return
 	}
 
-	if remoteListen {
+	if RportViewer > 0 && !rProxy {
 		li.Println("On the other side was launched - на другой стороне был запушен")
 		li.Println("`ngrokVNC [-]port`")
 		li.Println("On the other side the VNC viewer is waiting for the VNC server to be connected via ngrok - на другой стороне наблюдатель VNC ожидает подключения VNC экрана через туннель")
@@ -185,21 +236,37 @@ func server(args ...string) {
 		return
 	}
 	switch {
-	case proxy:
+	case proxy || plus || rProxy:
 		li.Println("The UltraVNC proxy is waiting for the UltraVNC viewer to connect -  UltraVNC прокси ожидает подключения UltraVNC наблюдателя")
-		li.Println("\ton TCP port", portRFB)
-		li.Println("\tTo view via ngrok~proxy~LAN on the other side, run - для просмотра через туннель~прокси~LAN на другой стороне запусти")
-		li.Println("\t`ngrokVNC :host[::port] [password]`")
+		li.Println("\ton TCP port", lPortRFB(RportRFB))
+		if connect != "" {
+			li.Println("The UltraVNC proxyII is waiting for the UltraVNC server to connect -  UltraVNC проксиII ожидает подключения UltraVNC экрана")
+			li.Println("\ton TCP port", lPortViewer(RportViewer))
+			li.Println("\tTo view via ngrok~proxy~ID on the other side, run - для просмотра через туннель~прокси~ID на другой стороне запусти")
+			li.Printf("\t`ngrokVNC :%s [password]`", id)
+		} else {
+			li.Println("\tTo view via ngrok~proxy~IP on the other side, run - для просмотра через туннель~прокси~IP на другой стороне запусти")
+			li.Printf("\t`ngrokVNC :%s [password]`", hpd(ip, portRFB, CportRFB))
+			li.Println("\tTo view via LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
+			li.Printf("\t`ngrokVNC %s [password]`", hpd(ip, portRFB, CportRFB))
+		}
 	case AcceptRfbConnections:
 		li.Println("The VNC server is waiting for the VNC viewer to connect - экран VNC ожидает подключения VNC наблюдателя")
 		li.Println("\ton TCP port", portRFB)
 		li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
 		li.Println("\t`ngrokVNC : [password]`")
 		li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
-		li.Println("\t`ngrokVNC host[::port] [password]`")
+		li.Printf("\t`ngrokVNC :%s [password]`", hpd(ip, portRFB, CportRFB))
+	}
+	if plus {
+		if !localListen {
+			planB(fmt.Errorf("listen %s", portRFB), ":"+portRFB)
+			err = nil
+		}
+		return
 	}
 	if AcceptRfbConnections {
-		err = run(context.Background(), ":"+portRFB, false)
+		err = run(context.Background(), ":"+lPortRFB(portRFB), false)
 	}
 
 	if err != nil {
@@ -210,34 +277,35 @@ func server(args ...string) {
 		}
 	}
 }
-
+func interfaces() (ifs []string) {
+	ifaces, err := net.Interfaces()
+	if err == nil {
+		for _, ifac := range ifaces {
+			addrs, err := ifac.Addrs()
+			if err != nil || ifac.Flags&net.FlagUp == 0 || ifac.Flags&net.FlagRunning == 0 || ifac.Flags&net.FlagLoopback != 0 {
+				continue
+			}
+			for _, addr := range addrs {
+				if strings.Contains(addr.String(), ":") {
+					continue
+				}
+				ifs = append(ifs, addr.String())
+			}
+		}
+	}
+	return
+}
 func planB(err error, dest string) {
 	if !AcceptRfbConnections {
 		letf.Println("no accept connections")
 		return
 	}
 	s := "LAN mode - режим локальной сети"
-	i := 0
+
 	let.Println(err)
-	ifaces, err := net.Interfaces()
-	if err == nil {
-		for _, ifac := range ifaces {
-			addrs, err := ifac.Addrs()
-			if err != nil {
-				continue
-			}
-			for _, addr := range addrs {
-				if strings.Contains(addr.String(), ":") ||
-					strings.HasPrefix(addr.String(), "127.") {
-					continue
-				}
-				s += "\n\t" + addr.String()
-				i++
-			}
-		}
-	}
-	if i > 0 {
+	if len(ips) > 0 {
 		li.Println(s)
+		li.Println(strings.Join(ips, "\n\t"))
 		watch(dest)
 	} else {
 		letf.Println("no ifaces for server")
@@ -272,9 +340,9 @@ func run(ctx context.Context, dest string, http bool) error {
 			ca()
 		}
 	}()
-	endpoint := config.TCPEndpoint()
+	endpoint := config.TCPEndpoint(config.WithForwardsTo(withForwardsTo(dest)))
 	if http {
-		endpoint = config.HTTPEndpoint()
+		endpoint = config.HTTPEndpoint(config.WithForwardsTo(withForwardsTo(dest)))
 	}
 	tun, err := ngrok.Listen(ctx,
 		endpoint,
@@ -315,10 +383,9 @@ func run(ctx context.Context, dest string, http bool) error {
 			return srcError(err)
 		}
 
-		ltf.Println("accepted connection from", conn.RemoteAddr())
+		ltf.Println("accepted connection from", conn.RemoteAddr(), "to", conn.LocalAddr())
 
-		go PrintOk("connection closed:", handleConn(ctx, dest, conn))
-		// go handleConn(ctx, dest, conn)
+		go PrintOk("connection closed", handleConn(ctx, dest, conn))
 	}
 }
 
@@ -334,11 +401,14 @@ func handleConn(ctx context.Context, dest string, conn net.Conn) error {
 
 	g.Go(func() error {
 		_, err := io.Copy(next, conn)
-		next.(*net.TCPConn).CloseWrite()
+		next.(*net.TCPConn).CloseWrite() //for close without error
+		time.Sleep(time.Millisecond * 7)
+		next.Close()
 		return srcError(err)
 	})
 	g.Go(func() error {
 		_, err := io.Copy(conn, next)
+		conn.Close()
 		return srcError(err)
 	})
 
@@ -365,6 +435,23 @@ func taskList(fi string) string {
 	return bBuffer.String()
 }
 
+func tl(fi string) (bBuffer bytes.Buffer) {
+	list := exec.Command(
+		"tasklist",
+		"/nh",
+		"/fi",
+		fi,
+	)
+	list.Stdout = &bBuffer
+	list.Stderr = &bBuffer
+	err := list.Run()
+	if err != nil {
+		PrintOk(cmd("Run", list), err)
+		return
+	}
+	return
+}
+
 func GetBoolValue(k registry.Key, key string) bool {
 	val, _, err := k.GetIntegerValue(key)
 	if err == nil {
@@ -379,25 +466,21 @@ func SetDWordValue(k registry.Key, key string, val int) {
 		PrintOk(key, k.SetDWordValue(key, uint32(val)))
 	}
 }
-
-func netstat(a, host, pid string) (contains string) {
+func ns(a string) string {
 	var (
-		bBuffer bytes.Buffer
 		err     error
+		bBuffer bytes.Buffer
 	)
-	ok := "LISTENING"
-	if a == "" {
-		ok = "ESTABLISHED"
-		a = "-o"
-	}
-	stat := exec.Command(
-		"netstat",
+	opts := []string{
 		"-n",
 		"-p",
 		"TCP",
 		"-o",
-		a,
-	)
+	}
+	if a != "" {
+		opts = append(opts, a)
+	}
+	stat := exec.Command("netstat", opts...)
 	stat.Stdout = &bBuffer
 	stat.Stderr = &bBuffer
 	err = stat.Run()
@@ -405,7 +488,19 @@ func netstat(a, host, pid string) (contains string) {
 		PrintOk(cmd("Run", stat), err)
 		return ""
 	}
+	return bBuffer.String()
+}
 
+func nStat(all, a, host, pid string) (contains string) {
+	var (
+		err     error
+		bBuffer bytes.Buffer
+	)
+	ok := "LISTENING"
+	if a == "" {
+		ok = "ESTABLISHED"
+	}
+	bBuffer.WriteString(all)
 	for {
 		contains, err = bBuffer.ReadString('\n')
 		if err != nil {
@@ -417,30 +512,53 @@ func netstat(a, host, pid string) (contains string) {
 	}
 }
 
-func p590x(serv string) {
-	if serv == "" {
+func netstat(a, host, pid string) (contains string) {
+	return nStat(ns(a), a, host, pid)
+}
+
+func p5ixx(key, val string, i int) {
+	if val == "" {
 		return
 	}
-	parts := strings.Split(taskList("services eq "+serv), ".exe")
-	if len(parts) < 2 {
-		return
+	s50 := strconv.Itoa(50 + i)
+	bBufferTL := tl(key + " eq " + val)
+	all := ns("-a")
+	for {
+		line, err := bBufferTL.ReadString('\n')
+		if err != nil {
+			return
+		}
+		parts := strings.Split(line, ".exe")
+		if len(parts) < 2 {
+			continue
+		}
+		pid := strings.Split(strings.TrimSpace(parts[1]), " ")[0]
+		pref := "  TCP    0.0.0.0:" + s50
+		suffix := strings.Split(strings.TrimPrefix(nStat(all, "-a", pref, pid), pref), " ")[0]
+		if suffix == "" {
+			continue
+		}
+		x, err := strconv.Atoi(s50 + suffix)
+		if err != nil || x > (50+i+1)*100-1 || x < (50+i)*100 {
+			continue
+		}
+		ltf.Println(key, val, x)
+		if i == 9 {
+			proxy = val == "repeater_service"
+			if proxy {
+				PportRFB = strconv.Itoa(x)
+			} else {
+				portRFB = strconv.Itoa(x)
+			}
+		} else {
+			proxy2 = val == "repeater_service"
+			if proxy2 {
+				PportViewer = x
+			} else {
+				portViewer = x
+			}
+		}
 	}
-	pid := strings.Split(strings.TrimSpace(parts[1]), " ")[0]
-	pref := "  TCP    0.0.0.0:590"
-	suffix := strings.Split(strings.TrimPrefix(netstat("-a", pref, pid), pref), " ")[0]
-	if suffix == "" {
-		return
-	}
-	i, err := strconv.Atoi("590" + suffix)
-	if err != nil {
-		return
-	}
-	if i > 5999 {
-		return
-	}
-	proxy = serv == "repeater_service"
-	portRFB = strconv.Itoa(i)
-	ltf.Println(serv, portRFB)
 }
 
 func ll() {
@@ -467,5 +585,88 @@ func SetValue(section *ini.Section, key, val string) (set bool) {
 		ltf.Println(key, val)
 		section.Key(key).SetValue(val)
 	}
+	return
+}
+
+func contains(net, ip string) bool {
+	network, err := netip.ParsePrefix(net)
+	if err != nil {
+		return false
+	}
+	ipContains, err := netip.ParsePrefix(ip)
+	if err != nil {
+		return false
+	}
+	return network.Contains(ipContains.Addr())
+}
+
+func fromNgrok(forwardsTo string) (connect, listen, inLAN string) {
+	netsPorts := strings.Split(forwardsTo, ":")
+	nets := strings.Split(netsPorts[0], ",")
+	for _, ip := range ips {
+		for _, net := range nets {
+			listen = strings.Split(net, "/")[0]
+			if !contains(net, ip) {
+				continue
+			}
+			inLAN = listen
+		}
+	}
+	ltf.Println(netsPorts, listen, inLAN)
+	switch len(netsPorts) {
+	case 2:
+		if strings.HasPrefix(netsPorts[1], "59") {
+			RportRFB = netsPorts[1]
+		}
+		if strings.HasPrefix(netsPorts[1], "55") {
+			RportViewer, _ = strconv.Atoi(netsPorts[1])
+		}
+		return
+	case 3:
+		RportRFB = netsPorts[1]
+		rProxy = true
+		if netsPorts[2] == "" {
+			RportViewer = 0
+			return
+		}
+		rProxy2 = true
+		RportViewer, _ = strconv.Atoi(netsPorts[2])
+		if inLAN != "" {
+			if RportViewer == CportViewer {
+				connect = inLAN
+				return
+			}
+			connect = fmt.Sprintf("%s::%d", inLAN, RportViewer)
+		}
+	}
+	return
+}
+func lPortRFB(port string) string {
+	if proxy {
+		return PportRFB
+	}
+	return port
+}
+func lPortViewer(port int) int {
+	if proxy2 {
+		return PportViewer
+	}
+	return port
+}
+func hpd(h, p, c string) string {
+	if p == c {
+		return h
+	}
+	return h + "::" + p
+}
+func withForwardsTo(lPort string) (meta string) {
+	meta = strings.Join(ips, ",") + lPort
+	if proxy {
+		meta += ":"
+	}
+	if proxy2 {
+		meta += strconv.Itoa(PportViewer)
+	}
+	ltf.Println("withForwardsTo", meta)
 	return
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -11,17 +12,30 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+const (
+	CportRFB    = "5900"
+	CportViewer = 5500
+)
+
 var (
 	//go:embed NGROK_AUTHTOKEN.txt
 	NGROK_AUTHTOKEN string
 	//go:embed NGROK_API_KEY.txt
 	NGROK_API_KEY string
+	//go:embed uvnc.pkey.txt
+	pkey []byte
 
-	TO         = time.Second * 60
-	portRFB    = "5900"
-	portViewer = 5500
-	VNC        = map[string]string{"name": ""}
-	TightVNC   = map[string]string{
+	keyFN       = "20230722_Viewer_ClientAuth.pkey"
+	errC        error
+	TO          = time.Second * 60
+	portRFB     = CportRFB
+	portViewer  = CportViewer
+	RportRFB    = ""
+	RportViewer = 0
+	PportRFB    = CportRFB
+	PportViewer = CportViewer
+	VNC         = map[string]string{"name": ""}
+	TightVNC    = map[string]string{
 		"name":     "TightVNC",
 		"server":   "tvnserver.exe",
 		"viewer":   "tvnviewer.exe",
@@ -56,13 +70,38 @@ var (
 	VNCs = []map[string]string{TightVNC, UltraVNC, TurboVNC, RealVNC}
 	serverExe,
 	viewerExe,
-	control string
+	control,
+	connect,
+	publicURL,
+	forwardsTo,
+	listen,
+	inLAN,
+	ip string
+	id                   = "0"
 	AcceptRfbConnections = true
-	proxy, localListen   bool
-	k                    registry.Key
+	proxy,
+	proxy2,
+	rProxy,
+	rProxy2,
+	localListen,
+	plus,
+	plus2 bool
+	k   registry.Key
+	tcp *url.URL
+	ips []string
 )
 
 func main() {
+	if len(os.Args) == 1 {
+		usage()
+	}
+
+	ips = interfaces()
+	if len(ips) == 0 {
+		letf.Println("not connected")
+		return
+	}
+
 	cwd, err := os.Getwd()
 	if err == nil {
 		for _, xVNC := range VNCs {
@@ -105,6 +144,13 @@ func main() {
 	li.Println(VNC["name"], VNC["path"])
 	serverExe = filepath.Join(VNC["path"], VNC["server"])
 	viewerExe = filepath.Join(VNC["path"], VNC["viewer"])
+	if VNC["name"] == "UltraVNC" {
+		keyFN = filepath.Join(VNC["path"], keyFN)
+		_, err := os.Stat(keyFN)
+		if err != nil {
+			PrintOk(keyFN, os.WriteFile(keyFN, pkey, 0666))
+		}
+	}
 
 	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //if emty then local mode
 	// NGROK_AUTHTOKEN += "-"                                       // emulate bad token or no internet
@@ -117,8 +163,56 @@ func main() {
 		args[k] = strings.ReplaceAll(v, ";", ":")
 	}
 
+	p5ixx("imagename", VNC["server"], 9)
+	p5ixx("services", "repeater_service", 9)
+	if proxy {
+		p5ixx("services", "repeater_service", 5)
+	}
+	publicURL, forwardsTo, errC = ngrokAPI(NGROK_API_KEY)
+	PrintOk(forwardsTo, errC)
+
+	ip = strings.Split(ips[len(ips)-1], "/")[0]
+	if errC == nil {
+		tcp, err = url.Parse(publicURL)
+		if err != nil {
+			letf.Println(err)
+			return
+		}
+		connect, listen, inLAN = fromNgrok(forwardsTo)
+		letf.Println(connect, listen)
+		if rProxy {
+			plusS := "+"
+			if rProxy2 {
+				PrintOk("Is VNC proxyII listen - VNC проксиII ожидает подключения?", errC)
+				//192.168.0.2->19216802
+				id = "00000" + strings.ReplaceAll(ip, ".", "")
+				id = strings.Trim(id[len(id)-9:], "0")
+				plusS += id
+			} else {
+				PrintOk("Is VNC proxy listen - VNC прокси ожидает подключения?", errC)
+			}
+			if len(args) == 1 {
+				if inLAN != "" {
+					args = append(args, plusS) //server
+				} else {
+					args = append(args, ":") //viewer
+				}
+			}
+		} else {
+			if RportRFB != "" {
+				PrintOk("Is VNC server listen - VNC экран ожидает подключения?", errC)
+				if len(args) == 1 {
+					args = append(args, ":") //viewer
+				}
+			}
+			if RportViewer > 0 {
+				PrintOk("Is VNC viewer listen - VNC наблюдатель ожидает подключения?", errC)
+			}
+		}
+	}
 	if len(args) > 1 {
-		_, err := strconv.Atoi(args[1])
+		plus = strings.HasPrefix(args[1], "+")
+		i, err := strconv.Atoi(args[1])
 		if err != nil {
 			switch {
 			case args[1] == "-":
@@ -127,7 +221,7 @@ func main() {
 			case strings.HasPrefix(args[1], "-"):
 				// - try connect server to viewer via LAN (revers)
 				serverLAN(args...)
-			case strings.HasPrefix(args[1], "::"):
+			case strings.HasPrefix(args[1], "::") || plus:
 				// :: as ::5900
 				server(args...)
 			default:
@@ -135,6 +229,7 @@ func main() {
 				// host[:display] [password] as LAN viewer connect mode
 				// :host[::port] [password] as ngrok~proxy~LAN viewer connect mode
 				// :host[:display] [password] as ngrok~proxy~LAN viewer connect mode
+				// :id[:123456789] [password] as ngrok~proxy~IP viewer connect mode
 				// : [password] as ngrok viewer connect mode
 				// host as host:0 as host: as host::5900 as host::
 				viewer(args...)
@@ -144,11 +239,19 @@ func main() {
 		// -port as LAN viewer listen mode
 		// port as ngrok viewer listen mode
 		// 0  as 5500
-		viewerl(args...)
+		//+id as server with proxy  -id:id
+		if plus {
+			plus2 = true
+			id = strconv.Itoa(i)
+			server(args...)
+		} else {
+			viewerl(args...)
+		}
 		return
 	}
 	// as GUI or reg RfbPort
 	server(args...)
+
 }
 
 func abs(s string) string {
@@ -160,6 +263,7 @@ func abs(s string) string {
 	return s
 }
 func usage() {
+	li.Println("Usage - использование 8><--------------------------------------------")
 	li.Println("Run - запусти")
 	li.Println("`ngrokVNC [::port]`")
 	li.Println("When there is no ngrok tunnel it will be created  - когда ngrok туннеля нет он создатся")
@@ -187,4 +291,5 @@ func usage() {
 	li.Println("the VNC server is waiting for ngrok tunnel of the VNC viewer to connect to it - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится")
 	li.Println("\tTo view via ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти")
 	li.Println("\t`ngrokVNC 0`")
+	li.Println("--------------------------------------------><8")
 }

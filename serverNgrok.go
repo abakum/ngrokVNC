@@ -13,13 +13,14 @@ import (
 
 func serverNgrok(args ...string) {
 	ltf.Println("serverNgrok", args)
-	li.Printf("%q -\n", args[0])
+	li.Printf(`"%s" -\n`, args[0])
 	var (
 		err error
 		sRun,
 		shutdown,
 		cont,
 		sConnect *exec.Cmd
+		new string
 	)
 	defer closer.Close()
 
@@ -56,7 +57,7 @@ func serverNgrok(args ...string) {
 	li.Println("\tTo view via ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти")
 	li.Println("\t`ngrokVNC 0`")
 	for {
-		publicURL, _, errC := ngrokAPI(NGROK_API_KEY)
+		publicURL, _, errC = ngrokAPI(NGROK_API_KEY)
 		remoteListen := errC == nil
 		if !remoteListen {
 			time.Sleep(TO)
@@ -112,7 +113,7 @@ func serverNgrok(args ...string) {
 		sConnect.Stderr = os.Stderr
 		PrintOk(cmd("Run", sConnect), sConnect.Run())
 		for {
-			new, _, errC := ngrokAPI(NGROK_API_KEY)
+			new, _, errC = ngrokAPI(NGROK_API_KEY)
 			remoteListen = errC == nil
 			if !remoteListen || publicURL != new {
 				PrintOk("VNC viewer connected - VNC наблюдатель подключен?", errC)

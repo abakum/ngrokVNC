@@ -16,7 +16,7 @@ import (
 
 func viewerl(args ...string) {
 	ltf.Println("viewerl", args)
-	li.Printf("%q [-]port\n", args[0])
+	li.Printf(`"%s" [-]port\n`, args[0])
 	var (
 		err error
 	)
@@ -59,6 +59,20 @@ func viewerl(args ...string) {
 			li.Println("\t`ngrokVNC`")
 		}
 	}
+	OportViewer := portViewer
+	portViewer = 0
+	p5ixx("imagename", VNC["viewer"], 5)
+	if portViewer > 0 {
+		letf.Println(VNC["viewer"], "alredy listen on", portViewer)
+		localListen = portViewer == OportViewer
+		if !localListen {
+			killViewer := exec.Command("taskKill", "/f", "/im", VNC["viewer"])
+			killViewer.Stdout = os.Stdout
+			killViewer.Stderr = os.Stderr
+			PrintOk(cmd("Run", killViewer), killViewer.Run())
+		}
+	}
+	portViewer = OportViewer
 
 	opts := []string{"-listen"}
 	port := strconv.Itoa(portViewer)
@@ -115,7 +129,7 @@ func viewerl(args ...string) {
 		opts = append(opts, port)
 	}
 
-	if p550x() != portViewer {
+	if !localListen {
 		viewer := exec.Command(viewerExe, opts...)
 		viewer.Stdout = os.Stdout
 		viewer.Stderr = os.Stderr
@@ -133,19 +147,16 @@ func viewerl(args ...string) {
 		}()
 		time.Sleep(time.Second)
 	}
-
 	port = ":" + port
 	if NGROK_AUTHTOKEN == "" {
 		planB(Errorf("empty NGROK_AUTHTOKEN"), port)
 		return
 	}
 
-	_, forwardsTo, err := ngrokAPI(NGROK_API_KEY)
-	if err == nil {
+	if errC == nil {
 		planB(Errorf("found online client: %s", forwardsTo), port)
 		return
 	}
-	err = nil
 
 	err = run(context.Background(), port, false)
 
@@ -156,30 +167,4 @@ func viewerl(args ...string) {
 			err = nil
 		}
 	}
-}
-
-func p550x() (i int) {
-	pref := "  TCP    0.0.0.0:550"
-	ok := netstat("-a", pref, "")
-	if ok == "" {
-		return 0
-	}
-	parts := strings.Split(strings.TrimPrefix(ok, pref), " ")
-	i, err := strconv.Atoi("550" + parts[0])
-	if err != nil {
-		return
-	}
-	if i > 5599 {
-		return i
-	}
-	ltf.Println("listen", i, ok)
-	return i
-}
-
-func replaceSpaceSpace(s string) (trim string) {
-	trim = s
-	for strings.Contains(trim, "  ") {
-		trim = strings.ReplaceAll(trim, "  ", " ")
-	}
-	return
 }

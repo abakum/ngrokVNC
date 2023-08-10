@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,14 +13,12 @@ import (
 
 func viewer(args ...string) {
 	ltf.Println("viewer", args)
-	li.Printf("%q {[:]host[::port]|[:]host[:display]|:} [password]\n", args[0])
+	li.Printf(`"%s" {[:]host[::port]|[:]host[:display]|:id[:123456789]|:} [password]\n`, args[0])
 	li.Println("On the other side should be running - на другой стороне должен быть запущен")
 	li.Println("`ngrokVNC [::port]`")
 	var (
-		err error
-		host,
-		publicURL string
-		tcp *url.URL
+		err  error
+		host string
 	)
 	defer closer.Close()
 
@@ -35,14 +32,16 @@ func viewer(args ...string) {
 
 	// host[::port] [password] as LAN viewer connect mode
 	// host[:display] [password] as LAN viewer connect mode
-	// :host[::port] [password] as ngrok~proxy~LAN viewer connect mode
-	// :host[:display] [password] as ngrok~proxy~LAN viewer connect mode
+	// :host[::port] [password] as ngrok~proxy~IP viewer connect mode
+	// :host[:display] [password] as ngrok~proxy~IP viewer connect mode
 	// : [password] as ngrok viewer connect mode
 	// host as host: as host:0 as host:: as host::5900
+	// :id [password] as ngrok~proxy~ID viewer connect mode
 	if len(args) > 1 {
 		host = abs(args[1])
 		if strings.HasPrefix(host, ":") {
 			proxy = host != ":" && NGROK_API_KEY != "" && VNC["name"] != "TightVNC"
+			// host, _, _ = hp(strings.TrimPrefix(host, ":"), portRFB)
 			host = strings.TrimPrefix(host, ":")
 		}
 	}
@@ -59,19 +58,18 @@ func viewer(args ...string) {
 		opts = append(opts, h)
 	}
 	if proxy || !LAN {
-		via = []string{"ngrok", "туннель"}
-		publicURL, _, err = ngrokAPI(NGROK_API_KEY)
-		if err != nil {
-			return
-		}
-
-		tcp, err = url.Parse(publicURL)
-		if err != nil {
-			err = srcError(err)
-			return
-		}
-		if proxy {
-			via = []string{"ngrok~proxy~LAN", "туннель~прокси~LAN"}
+		if proxy || rProxy {
+			if rProxy2 {
+				via = []string{"ngrok~proxy~ID", "туннель~прокси~ID"}
+				if host == "" {
+					opts = append(opts, "id:0")
+				}
+			} else {
+				via = []string{"ngrok~proxy~IP", "туннель~прокси~IP"}
+				if host == "" {
+					opts = append(opts, listen)
+				}
+			}
 			switch VNC["name"] {
 			case "UltraVNC":
 				opts = append(opts, "-proxy")
@@ -79,7 +77,9 @@ func viewer(args ...string) {
 				opts = append(opts, "-via")
 			}
 		}
-		opts = append(opts, strings.Replace(tcp.Host, ":", "::", 1))
+		if tcp != nil {
+			opts = append(opts, strings.Replace(tcp.Host, ":", "::", 1))
+		}
 	}
 	li.Printf("The VNC viewer connects to the waiting VNC server via %s - наблюдатель VNC подключается к ожидающему экрану VNC через %s\n", via[0], via[1])
 
