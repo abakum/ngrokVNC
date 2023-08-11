@@ -168,6 +168,7 @@ func server(args ...string) {
 						"net",
 						"stop",
 						VNC["services"])
+					// stop := exec.Command(serverExe, "-stopservice")
 					stop.Stdout = os.Stdout
 					stop.Stderr = os.Stderr
 					PrintOk(cmd("Run", stop), stop.Run())
@@ -176,6 +177,7 @@ func server(args ...string) {
 						"net",
 						"start",
 						VNC["services"])
+					// start := exec.Command(serverExe, "-startservice")
 					start.Stdout = os.Stdout
 					start.Stderr = os.Stderr
 					PrintOk(cmd("Run", start), start.Run())
