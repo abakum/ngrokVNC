@@ -7,7 +7,7 @@
 
 ## Usage - использование:
 
-- git clone https://github.com/abakum/ngrokVNC
+- `git clone https://github.com/abakum/ngrokVNC`
 - place - размести `NGROK_AUTHTOKEN.txt` and - и `NGROK_API_KEY.txt` to - в `ngrokVNC` before - перед `go build .` or set env during run - или установи переменные окружения во время запуска `ngrokVNC`
 - Run - запусти<br>`ngrokVNC [::port]`
 - When there is no ngrok tunnel it will be created  - когда ngrok туннеля нет он создатся
