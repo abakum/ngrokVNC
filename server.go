@@ -388,25 +388,25 @@ func handleConn(ctx context.Context, dest string, conn net.Conn) error {
 	return g.Wait()
 }
 
-func taskList(fi string) string {
-	var (
-		bBuffer bytes.Buffer
-	)
-	list := exec.Command(
-		"tasklist",
-		"/nh",
-		"/fi",
-		fi,
-	)
-	list.Stdout = &bBuffer
-	list.Stderr = &bBuffer
-	err := list.Run()
-	if err != nil {
-		PrintOk(cmd("Run", list), err)
-		return ""
-	}
-	return bBuffer.String()
-}
+// func taskList(fi string) string {
+// 	var (
+// 		bBuffer bytes.Buffer
+// 	)
+// 	list := exec.Command(
+// 		"tasklist",
+// 		"/nh",
+// 		"/fi",
+// 		fi,
+// 	)
+// 	list.Stdout = &bBuffer
+// 	list.Stderr = &bBuffer
+// 	err := list.Run()
+// 	if err != nil {
+// 		PrintOk(cmd("Run", list), err)
+// 		return ""
+// 	}
+// 	return bBuffer.String()
+// }
 
 func tl(fi string) (bBuffer bytes.Buffer) {
 	list := exec.Command(
@@ -541,7 +541,8 @@ func ll() {
 		if xVNC["server"] == "" {
 			continue
 		}
-		localListen = strings.Contains(taskList("services eq "+xVNC["services"]), xVNC["server"])
+		bBuffer := tl("services eq " + xVNC["services"])
+		localListen = strings.Contains(bBuffer.String(), xVNC["server"])
 		if localListen {
 			control = "-controlservice"
 			k = registry.LOCAL_MACHINE

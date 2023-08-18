@@ -87,7 +87,8 @@ var (
 	localListen,
 	plus,
 	plus2,
-	reload bool
+	reload,
+	first bool
 	k   registry.Key
 	tcp *url.URL
 	ips []string
@@ -97,6 +98,10 @@ func main() {
 	if len(os.Args) == 1 {
 		usage()
 	}
+	executable, _ := os.Executable()
+	imagename := filepath.Base(executable)
+	bBuffer := tl("imagename eq " + imagename)
+	first = strings.Count(bBuffer.String(), imagename) == 1
 
 	ips = interfaces()
 	if len(ips) == 0 {
@@ -195,7 +200,7 @@ func main() {
 				PrintOk("Is VNC proxy listen - VNC прокси ожидает подключения?", errC)
 			}
 			if len(args) == 1 {
-				if inLAN != "" {
+				if inLAN != "" && first {
 					args = append(args, plusS) //server
 				} else {
 					args = append(args, ":") //viewer
