@@ -23,7 +23,7 @@ import (
 )
 
 func server(args ...string) {
-	ltf.Println("server", args)
+	ltf.Println(args)
 	li.Printf("\"%s\" {+[id]|[::port]}\n", args[0])
 
 	var (
@@ -124,9 +124,9 @@ func server(args ...string) {
 			setCommandLine("")
 		} else {
 			setCommandLine(fmt.Sprintf("-autoreconnect ID:%s -connect %s", id, connect))
-			if rProxy {
-				return
-			}
+			// if rProxy {
+			// 	return
+			// }
 		}
 	} else {
 		opts := []string{}
@@ -208,7 +208,7 @@ func server(args ...string) {
 			PrintOk(cmd("Run", sConnect), sConnect.Run())
 			closer.Hold()
 		}
-		return
+		// return
 	}
 	switch {
 	case proxy || plus || rProxy:
@@ -234,11 +234,8 @@ func server(args ...string) {
 		li.Printf("\t`ngrokVNC %s [password]`", hpd(ip, portRFB, CportRFB))
 	}
 	if plus {
-		if !localListen {
-			planB(fmt.Errorf("listen %s", portRFB), ":"+portRFB)
-			err = nil
-		}
-		return
+		planB(fmt.Errorf("listen %s", portRFB), ":"+portRFB)
+		err = nil
 	}
 	if AcceptRfbConnections {
 		err = run(context.Background(), ":"+lPortRFB(portRFB), false)

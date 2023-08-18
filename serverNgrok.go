@@ -12,7 +12,7 @@ import (
 )
 
 func serverNgrok(args ...string) {
-	ltf.Println("serverNgrok", args)
+	ltf.Println(args)
 	li.Printf("\"%s\" -\n", args[0])
 	var (
 		err error
@@ -53,7 +53,6 @@ func serverNgrok(args ...string) {
 		return
 	}
 
-	li.Println("`ngrokVNC -`")
 	li.Println("the VNC server is waiting for ngrok tunnel of the VNC viewer to connect to it - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится")
 	li.Println("\tTo view via ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти")
 	li.Println("\t`ngrokVNC 0 [password]`")

@@ -15,7 +15,7 @@ import (
 )
 
 func viewerl(args ...string) {
-	ltf.Println("viewerl", args)
+	ltf.Println(args)
 	li.Printf("\"%s\" [-]port [password]\n", args[0])
 	var (
 		err error

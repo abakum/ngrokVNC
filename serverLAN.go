@@ -13,7 +13,7 @@ import (
 )
 
 func serverLAN(args ...string) {
-	ltf.Println("serverLAN", args)
+	ltf.Println(args)
 	li.Printf("\"%s\" -host\n", args[0])
 	var (
 		err error

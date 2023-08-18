@@ -12,7 +12,7 @@ import (
 )
 
 func viewer(args ...string) {
-	ltf.Println("viewer", args)
+	ltf.Println(args)
 	li.Printf("\"%s\" {[:]host[::port]|[:]host[:display]|:id[:123456789]|:} [password]\n", args[0])
 	li.Println("On the other side should be running - на другой стороне должен быть запущен")
 	li.Println("`ngrokVNC [::port]`")
