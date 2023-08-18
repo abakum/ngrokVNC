@@ -13,7 +13,7 @@ import (
 
 func serverNgrok(args ...string) {
 	ltf.Println("serverNgrok", args)
-	li.Printf(`"%s" -\n`, args[0])
+	li.Printf("\"%s\" -\n", args[0])
 	var (
 		err error
 		sRun,
@@ -45,6 +45,7 @@ func serverNgrok(args ...string) {
 				PrintOk(cmd("Run", shutdown), shutdown.Run())
 			}
 		}
+		setCommandLine("")
 		// pressEnter()
 	})
 	if NGROK_AUTHTOKEN == "" {
@@ -55,7 +56,7 @@ func serverNgrok(args ...string) {
 	li.Println("`ngrokVNC -`")
 	li.Println("the VNC server is waiting for ngrok tunnel of the VNC viewer to connect to it - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится")
 	li.Println("\tTo view via ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти")
-	li.Println("\t`ngrokVNC 0`")
+	li.Println("\t`ngrokVNC 0 [password]`")
 	for {
 		publicURL, _, errC = ngrokAPI(NGROK_API_KEY)
 		remoteListen := errC == nil
@@ -101,17 +102,26 @@ func serverNgrok(args ...string) {
 			}
 		}
 		tcp, err := url.Parse(publicURL)
-		host := publicURL
+		host := strings.Replace(publicURL, "tcp://", "", 1)
 		if err == nil {
-			host = strings.Replace(tcp.Host, ":", "::", 1)
+			host = tcp.Host
 		}
-		sConnect := exec.Command(serverExe, append(opts,
-			"-connect",
-			host,
-		)...)
-		sConnect.Stdout = os.Stdout
-		sConnect.Stderr = os.Stderr
-		PrintOk(cmd("Run", sConnect), sConnect.Run())
+		host = strings.Replace(host, ":", "::", 1)
+		if VNC["name"] == "UltraVNC" && localListen {
+			setCommandLine(fmt.Sprintf("-autoreconnect -connect %s", host))
+		} else {
+			if VNC["name"] == "UltraVNC" {
+				opts = append(opts, "-autoreconnect")
+			}
+			sConnect := exec.Command(serverExe, append(opts,
+				"-connect",
+				host,
+			)...)
+			sConnect.Stdout = os.Stdout
+			sConnect.Stderr = os.Stderr
+			PrintOk(cmd("Run", sConnect), sConnect.Run())
+			time.Sleep(time.Second)
+		}
 		for {
 			new, _, errC = ngrokAPI(NGROK_API_KEY)
 			remoteListen = errC == nil

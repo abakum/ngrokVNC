@@ -14,7 +14,7 @@ import (
 
 func serverLAN(args ...string) {
 	ltf.Println("serverLAN", args)
-	li.Printf(`"%s" -host\n`, args[0])
+	li.Printf("\"%s\" -host\n", args[0])
 	var (
 		err error
 		sRun,
@@ -48,6 +48,7 @@ func serverLAN(args ...string) {
 				PrintOk(cmd("Run", shutdown), shutdown.Run())
 			}
 		}
+		setCommandLine("")
 		// pressEnter()
 	})
 
@@ -62,23 +63,13 @@ func serverLAN(args ...string) {
 	li.Println("host", host)
 
 	li.Println("On the other side was launched - на другой стороне был запушен")
-	li.Println("`ngrokVNC -0`")
+	li.Println("`ngrokVNC -0 [password]`")
 	li.Println("On the other side the VNC viewer is waiting for the VNC server to be connected via LAN - на другой стороне наблюдатель VNC ожидает подключения VNC экрана через LAN")
 	li.Println("The VNC server connects to the waiting VNC viewer via LAN - экран VNC подключается к ожидающему VNC наблюдателю через LAN")
-	for {
-		errD := dial(hostD)
-		remoteListen := errD == nil
-		if !remoteListen {
-			time.Sleep(TO)
-			continue
-		}
-		PrintOk("Is viewer listen - VNC наблюдатель ожидает подключения?", errD)
-		ll()
-		opts := []string{}
-		if VNC["name"] == "TightVNC" {
-			opts = append(opts, control)
-		}
-
+	ll()
+	opts := []string{}
+	if VNC["name"] == "TightVNC" {
+		opts = append(opts, control)
 		if !localListen {
 			if shutdown == nil {
 				shutdown = exec.Command(serverExe, append(opts, VNC["kill"])...)
@@ -98,16 +89,14 @@ func serverLAN(args ...string) {
 		}
 
 		if cont == nil {
-			if VNC["name"] == "TightVNC" {
-				cont = exec.Command(serverExe, opts...)
-				cont.Stdout = os.Stdout
-				cont.Stderr = os.Stderr
-				go func() {
-					li.Println(cmd("Run", cont))
-					PrintOk(cmd("Closed", cont), cont.Run())
-					closer.Close()
-				}()
-			}
+			cont = exec.Command(serverExe, opts...)
+			cont.Stdout = os.Stdout
+			cont.Stderr = os.Stderr
+			go func() {
+				li.Println(cmd("Run", cont))
+				PrintOk(cmd("Closed", cont), cont.Run())
+				closer.Close()
+			}()
 		}
 		sConnect := exec.Command(serverExe, append(opts,
 			"-connect",
@@ -116,20 +105,36 @@ func serverLAN(args ...string) {
 		sConnect.Stdout = os.Stdout
 		sConnect.Stderr = os.Stderr
 		PrintOk(cmd("Run", sConnect), sConnect.Run())
-		time.Sleep(time.Second)
-		ESTABLISHED = netstat("", hostD, "")
-		for {
-			new = netstat("", hostD, "")
-			if new == "" || new != ESTABLISHED {
-				li.Println("VNC viewer connected - VNC наблюдатель подключен? no")
-				break
-			}
-			time.Sleep(TO)
+	} else {
+		//VNC["name"] == "UltraVNC"
+		if localListen {
+			setCommandLine(fmt.Sprintf("-autoreconnect -connect %s", host))
+		} else {
+			sConnect := exec.Command(serverExe, append(opts,
+				"-autoreconnect",
+				"-connect",
+				host,
+				"-run",
+			)...)
+			sConnect.Stdout = os.Stdout
+			sConnect.Stderr = os.Stderr
+			PrintOk(cmd("Run", sConnect), sConnect.Run())
+			time.Sleep(time.Second)
 		}
-		if shutdown != nil {
-			PrintOk(cmd("Run", shutdown), shutdown.Run())
-			shutdown = nil
+	}
+	time.Sleep(time.Second)
+	ESTABLISHED = netstat("", hostD, "")
+	for {
+		new = netstat("", hostD, "")
+		if new == "" || new != ESTABLISHED {
+			li.Println("VNC viewer connected - VNC наблюдатель подключен? no")
+			break
 		}
+		time.Sleep(TO)
+	}
+	if shutdown != nil {
+		PrintOk(cmd("Run", shutdown), shutdown.Run())
+		shutdown = nil
 	}
 }
 

@@ -76,7 +76,8 @@ var (
 	forwardsTo,
 	listen,
 	inLAN,
-	ip string
+	ip,
+	ultravnc string
 	id                   = "0"
 	AcceptRfbConnections = true
 	proxy,
@@ -85,7 +86,8 @@ var (
 	rProxy2,
 	localListen,
 	plus,
-	plus2 bool
+	plus2,
+	reload bool
 	k   registry.Key
 	tcp *url.URL
 	ips []string
@@ -145,6 +147,7 @@ func main() {
 	serverExe = filepath.Join(VNC["path"], VNC["server"])
 	viewerExe = filepath.Join(VNC["path"], VNC["viewer"])
 	if VNC["name"] == "UltraVNC" {
+		ultravnc = filepath.Join(VNC["path"], "ultravnc.ini")
 		keyFN = filepath.Join(VNC["path"], keyFN)
 		_, err := os.Stat(keyFN)
 		if err != nil {
@@ -179,7 +182,7 @@ func main() {
 			return
 		}
 		connect, listen, inLAN = fromNgrok(forwardsTo)
-		letf.Println(connect, listen)
+		letf.Println(connect, listen, inLAN)
 		if rProxy {
 			plusS := "+"
 			if rProxy2 {
@@ -202,7 +205,11 @@ func main() {
 			if RportRFB != "" {
 				PrintOk("Is VNC server listen - VNC экран ожидает подключения?", errC)
 				if len(args) == 1 {
-					args = append(args, ":") //viewer
+					if inLAN != "" {
+						args = append(args, listen) //viewer
+					} else {
+						args = append(args, ":") //viewer
+					}
 				}
 			}
 			if RportViewer > 0 {
@@ -232,6 +239,8 @@ func main() {
 				// :id[:123456789] [password] as ngrok~proxy~IP viewer connect mode
 				// : [password] as ngrok viewer connect mode
 				// host as host:0 as host: as host::5900 as host::
+				proxy = false
+				proxy2 = false
 				viewer(args...)
 			}
 			return
@@ -245,6 +254,8 @@ func main() {
 			id = strconv.Itoa(i)
 			server(args...)
 		} else {
+			proxy = false
+			proxy2 = false
 			viewerl(args...)
 		}
 		return

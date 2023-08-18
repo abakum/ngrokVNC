@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -25,12 +24,10 @@ import (
 
 func server(args ...string) {
 	ltf.Println("server", args)
-	li.Printf(`"%s" {+[id]|[::port]}\n`, args[0])
+	li.Printf("\"%s\" {+[id]|[::port]}\n", args[0])
 
 	var (
-		err      error
-		reload   bool
-		ultravnc string
+		err error
 	)
 	defer closer.Close()
 
@@ -39,6 +36,7 @@ func server(args ...string) {
 			let.Println(err)
 			defer os.Exit(1)
 		}
+		setCommandLine("")
 		// pressEnter()
 	})
 
@@ -91,7 +89,6 @@ func server(args ...string) {
 	case "UltraVNC":
 		AcceptRfbConnections = true
 		ini.PrettyFormat = false
-		ultravnc = filepath.Join(VNC["path"], "ultravnc.ini")
 		iniFile, err := ini.LoadSources(ini.LoadOptions{
 			IgnoreInlineComment: true,
 		}, ultravnc)
@@ -122,7 +119,16 @@ func server(args ...string) {
 			connect = ""
 		}
 	}
-	if !localListen {
+	if localListen {
+		if connect == "" {
+			setCommandLine("")
+		} else {
+			setCommandLine(fmt.Sprintf("-autoreconnect ID:%s -connect %s", id, connect))
+			if rProxy {
+				return
+			}
+		}
+	} else {
 		opts := []string{}
 		if connect != "" {
 			opts = append(opts,
@@ -149,45 +155,6 @@ func server(args ...string) {
 		}()
 		time.Sleep(time.Second)
 	}
-	if localListen {
-		serviceCommandLine := ""
-		if connect != "" {
-			serviceCommandLine = fmt.Sprintf("-autoreconnect ID:%s -connect %s", id, connect)
-		}
-		iniFile, err := ini.LoadSources(ini.LoadOptions{
-			IgnoreInlineComment: true,
-		}, ultravnc)
-		if err == nil {
-			section := iniFile.Section("admin")
-			if SetValue(section, "service_commandline", serviceCommandLine) || reload {
-				err = iniFile.SaveTo(ultravnc)
-				if err != nil {
-					letf.Println("error write", ultravnc)
-				} else {
-					stop := exec.Command(
-						"net",
-						"stop",
-						VNC["services"])
-					// stop := exec.Command(serverExe, "-stopservice")
-					stop.Stdout = os.Stdout
-					stop.Stderr = os.Stderr
-					PrintOk(cmd("Run", stop), stop.Run())
-
-					start := exec.Command(
-						"net",
-						"start",
-						VNC["services"])
-					// start := exec.Command(serverExe, "-startservice")
-					start.Stdout = os.Stdout
-					start.Stderr = os.Stderr
-					PrintOk(cmd("Run", start), start.Run())
-					p5ixx("imagename", VNC["server"], 9)
-				}
-			}
-		} else {
-			letf.Println("error read", ultravnc)
-		}
-	}
 	if VNC["name"] == "TightVNC" {
 		cont := exec.Command(serverExe, opts...)
 		cont.Stdout = os.Stdout
@@ -209,32 +176,38 @@ func server(args ...string) {
 		return
 	}
 
-	if RportViewer > 0 && !rProxy {
+	if RportViewer > 0 && RportRFB == "" { //&& !rProxy
 		li.Println("On the other side was launched - на другой стороне был запушен")
-		li.Println("`ngrokVNC [-]port`")
+		li.Printf("`ngrokVNC %d`", RportViewer-CportViewer)
 		li.Println("On the other side the VNC viewer is waiting for the VNC server to be connected via ngrok - на другой стороне наблюдатель VNC ожидает подключения VNC экрана через туннель")
 		li.Println("The VNC server connects to the waiting VNC viewer via ngrok - экран VNC подключается к ожидающему VNC наблюдателю через туннель")
 		tcp, err := url.Parse(publicURL)
-		host := publicURL
+		host := strings.Replace(publicURL, "tcp://", "", 1)
 		if err == nil {
-			host = strings.Replace(tcp.Host, ":", "::", 1)
+			host = tcp.Host
 		}
-		sConnect := exec.Command(serverExe, append(opts,
-			"-connect",
-			host,
-		)...)
-		sConnect.Stdout = os.Stdout
-		sConnect.Stderr = os.Stderr
-		if !localListen {
+		host = strings.Replace(host, ":", "::", 1)
+		if localListen {
+			setCommandLine(fmt.Sprintf("-autoreconnect -connect %s", host))
+		} else {
+			if VNC["name"] == "UltraVNC" {
+				opts = append(opts, "-autoreconnect")
+			}
+			sConnect := exec.Command(serverExe, append(opts,
+				"-connect",
+				host,
+			)...)
+			sConnect.Stdout = os.Stdout
+			sConnect.Stderr = os.Stderr
 			closer.Bind(func() {
 				if sConnect.Process != nil && sConnect.ProcessState == nil {
 					shutdown := exec.Command(serverExe, append(opts, VNC["kill"])...)
 					PrintOk(cmd("Run", shutdown), shutdown.Run())
 				}
 			})
+			PrintOk(cmd("Run", sConnect), sConnect.Run())
+			closer.Hold()
 		}
-		PrintOk(cmd("Run", sConnect), sConnect.Run())
-		closer.Hold()
 		return
 	}
 	switch {
@@ -258,7 +231,7 @@ func server(args ...string) {
 		li.Println("\tTo view via ngrok on the other side, run - для просмотра через туннель на другой стороне запусти")
 		li.Println("\t`ngrokVNC : [password]`")
 		li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
-		li.Printf("\t`ngrokVNC :%s [password]`", hpd(ip, portRFB, CportRFB))
+		li.Printf("\t`ngrokVNC %s [password]`", hpd(ip, portRFB, CportRFB))
 	}
 	if plus {
 		if !localListen {
@@ -279,6 +252,7 @@ func server(args ...string) {
 		}
 	}
 }
+
 func interfaces() (ifs []string) {
 	ifaces, err := net.Interfaces()
 	if err == nil {
@@ -615,17 +589,19 @@ func fromNgrok(forwardsTo string) (connect, listen, inLAN string) {
 		}
 	}
 	ltf.Println(netsPorts, listen, inLAN)
-	switch len(netsPorts) {
-	case 2:
+	if len(netsPorts) > 1 {
 		if strings.HasPrefix(netsPorts[1], "59") {
 			RportRFB = netsPorts[1]
 		}
 		if strings.HasPrefix(netsPorts[1], "55") {
 			RportViewer, _ = strconv.Atoi(netsPorts[1])
 		}
-		return
-	case 3:
-		RportRFB = netsPorts[1]
+		if RportViewer > 0 {
+			//case listen then ignore proxy
+			return
+		}
+	}
+	if len(netsPorts) > 2 {
 		rProxy = true
 		if netsPorts[2] == "" {
 			RportViewer = 0
@@ -671,4 +647,47 @@ func withForwardsTo(lPort string) (meta string) {
 	}
 	ltf.Println("withForwardsTo", meta)
 	return
+}
+
+func setCommandLine(serviceCommandLine string) {
+	if ultravnc == "" {
+		return
+	}
+	iniFile, err := ini.LoadSources(ini.LoadOptions{
+		IgnoreInlineComment: true,
+	}, ultravnc)
+	if err == nil {
+		section := iniFile.Section("admin")
+		if SetValue(section, "service_commandline", serviceCommandLine) || reload {
+			err = iniFile.SaveTo(ultravnc)
+			if err != nil {
+				letf.Println("error write", ultravnc)
+			} else {
+				if localListen {
+					stop := exec.Command(
+						"net",
+						"stop",
+						VNC["services"])
+					// stop := exec.Command(serverExe, "-stopservice")
+					stop.Stdout = os.Stdout
+					stop.Stderr = os.Stderr
+					PrintOk(cmd("Run", stop), stop.Run())
+					time.Sleep(time.Second)
+
+					start := exec.Command(
+						"net",
+						"start",
+						VNC["services"])
+					// start := exec.Command(serverExe, "-startservice")
+					start.Stdout = os.Stdout
+					start.Stderr = os.Stderr
+					PrintOk(cmd("Run", start), start.Run())
+					time.Sleep(time.Second)
+				}
+				p5ixx("imagename", VNC["server"], 9)
+			}
+		}
+	} else {
+		letf.Println("error read", ultravnc)
+	}
 }

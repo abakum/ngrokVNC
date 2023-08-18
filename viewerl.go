@@ -16,7 +16,7 @@ import (
 
 func viewerl(args ...string) {
 	ltf.Println("viewerl", args)
-	li.Printf(`"%s" [-]port\n`, args[0])
+	li.Printf("\"%s\" [-]port [password]\n", args[0])
 	var (
 		err error
 	)
@@ -127,6 +127,17 @@ func viewerl(args ...string) {
 		}
 	default:
 		opts = append(opts, port)
+	}
+
+	if len(args) > 2 {
+		switch VNC["name"] {
+		case "TightVNC":
+			opts = append(opts, "-password="+args[2])
+		case "RealVNC":
+		default:
+			opts = append(opts, "-password")
+			opts = append(opts, args[2])
+		}
 	}
 
 	if !localListen {
