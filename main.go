@@ -77,6 +77,7 @@ var (
 	listen,
 	inLAN,
 	ip,
+	ifs,
 	ultravnc string
 	id                   = "0"
 	AcceptRfbConnections = true
@@ -108,6 +109,7 @@ func main() {
 		letf.Println("not connected")
 		return
 	}
+	ifs = strings.Join(ips, ",")
 
 	cwd, err := os.Getwd()
 	if err == nil {
@@ -177,6 +179,10 @@ func main() {
 		p5ixx("services", "repeater_service", 5)
 	}
 	publicURL, forwardsTo, errC = ngrokAPI(NGROK_API_KEY)
+	if errC == nil && strings.HasPrefix(forwardsTo, ifs) && !first {
+		letf.Println("loop detected")
+		return
+	}
 	PrintOk(forwardsTo, errC)
 
 	ip = strings.Split(ips[len(ips)-1], "/")[0]

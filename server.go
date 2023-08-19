@@ -278,7 +278,7 @@ func planB(err error, dest string) {
 	let.Println(err)
 	if len(ips) > 0 {
 		li.Println(s)
-		li.Println(strings.Join(ips, "\n\t"))
+		li.Println(ifs)
 		watch(dest)
 	} else {
 		letf.Println("no ifaces for server")
@@ -636,7 +636,7 @@ func hpd(h, p, c string) string {
 	return h + "::" + p
 }
 func withForwardsTo(lPort string) (meta string) {
-	meta = strings.Join(ips, ",") + lPort
+	meta = ifs + lPort
 	if proxy {
 		meta += ":"
 	}
