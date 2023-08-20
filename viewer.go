@@ -94,40 +94,7 @@ func viewer(args ...string) {
 		}
 	}
 	if VNC["name"] == "UltraVNC" {
-		opts = append(opts, "-noToolBar")
-		ultravnc := filepath.Join(VNC["path"], "ultravnc.ini")
-		ini.PrettyFormat = false
-		iniFile, err := ini.Load(ultravnc)
-		DSMPlugin := ""
-		UseDSMPlugin := "0"
-		if err == nil {
-			section := iniFile.Section("admin")
-			DSMPlugin = section.Key("DSMPlugin").String()
-			if section.Key("UseDSMPlugin").String() == "1" && DSMPlugin != "" {
-				UseDSMPlugin = "1"
-				opts = append(opts, "-DSMPlugin")
-				opts = append(opts, DSMPlugin)
-			}
-		} else {
-			letf.Println("error read", ultravnc)
-		}
-		ultravnc = filepath.Join(VNC["path"], "options.vnc")
-		iniFile, err = ini.Load(ultravnc)
-		if err == nil {
-			section := iniFile.Section("options")
-			if SetValue(section, "UseDSMPlugin", UseDSMPlugin) ||
-				SetValue(section, "DSMPlugin", DSMPlugin) ||
-				SetValue(section, "RequireEncryption", UseDSMPlugin) ||
-				SetValue(section, "AllowUntrustedServers", "0") ||
-				SetValue(section, "showtoolbar", "0") {
-				err = iniFile.SaveTo(ultravnc)
-				if err != nil {
-					letf.Println("error write", ultravnc)
-				}
-			}
-		} else {
-			letf.Println("error read", ultravnc)
-		}
+		opts = options(opts)
 	}
 	viewer := exec.Command(viewerExe, opts...)
 	viewer.Dir = filepath.Dir(viewer.Path)
@@ -147,4 +114,36 @@ func cmd(s string, c *exec.Cmd) string {
 		return ""
 	}
 	return fmt.Sprintf(`%s "%s" %s`, s, c.Args[0], strings.Join(c.Args[1:], " "))
+}
+
+func options(o []string) (opts []string) {
+	opts = o[:]
+	if NGROK_API_KEY == "" {
+		UseDSMPlugin = "0"
+	}
+	vnc := filepath.Join(VNC["path"], "options.vnc")
+	iniFile, err := ini.Load(vnc)
+	if err == nil {
+		section := iniFile.Section("options")
+		if SetValue(section, "UseDSMPlugin", UseDSMPlugin) ||
+			SetValue(section, "DSMPlugin", DSMPlugin) ||
+			SetValue(section, "RequireEncryption", UseDSMPlugin) ||
+			SetValue(section, "AllowUntrustedServers", "0") ||
+			SetValue(section, "showtoolbar", "0") ||
+			false {
+			ini.PrettyFormat = false
+			err = iniFile.SaveTo(vnc)
+			if err != nil {
+				letf.Println("error write", vnc)
+			}
+		}
+	} else {
+		opts = append(opts, "-noToolBar")
+		if UseDSMPlugin == "1" && DSMPlugin != "" {
+			opts = append(opts, "-DSMPlugin")
+			opts = append(opts, DSMPlugin)
+		}
+		letf.Println("error read", vnc)
+	}
+	return
 }

@@ -4,14 +4,12 @@ import (
 	"context"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/xlab/closer"
 	"golang.org/x/sys/windows/registry"
-	"gopkg.in/ini.v1"
 )
 
 func viewerl(args ...string) {
@@ -43,6 +41,7 @@ func viewerl(args ...string) {
 			}
 		}
 		if strings.HasPrefix(args[1], "-") {
+
 			li.Println("The VNC viewer is waiting for the VNC server to be connected via LAN - наблюдатель VNC ожидает подключения VNC экрана через LAN")
 			li.Println("\ton TCP port", portViewer)
 			li.Println("\tTo view via LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
@@ -89,42 +88,7 @@ func viewerl(args ...string) {
 			PrintOk(key, err)
 		}
 	case "UltraVNC":
-		opts = append(opts, port)
-		opts = append(opts, "-noToolBar")
-		ultravnc := filepath.Join(VNC["path"], "ultravnc.ini")
-		ini.PrettyFormat = false
-		iniFile, err := ini.Load(ultravnc)
-		DSMPlugin := ""
-		UseDSMPlugin := "0"
-		if err == nil {
-			section := iniFile.Section("admin")
-			DSMPlugin = section.Key("DSMPlugin").String()
-			if section.Key("UseDSMPlugin").String() == "1" && DSMPlugin != "" {
-				UseDSMPlugin = "1"
-				opts = append(opts, "-DSMPlugin")
-				opts = append(opts, DSMPlugin)
-			}
-		} else {
-			letf.Println("error read", ultravnc)
-		}
-		ultravnc = filepath.Join(VNC["path"], "options.vnc")
-		iniFile, err = ini.Load(ultravnc)
-		if err == nil {
-			section := iniFile.Section("options")
-			if SetValue(section, "UseDSMPlugin", UseDSMPlugin) ||
-				SetValue(section, "DSMPlugin", DSMPlugin) ||
-				SetValue(section, "RequireEncryption", UseDSMPlugin) ||
-				SetValue(section, "AllowUntrustedServers", "0") ||
-				SetValue(section, "ListenPort", port) ||
-				SetValue(section, "showtoolbar", "0") {
-				err = iniFile.SaveTo(ultravnc)
-				if err != nil {
-					letf.Println("error write", ultravnc)
-				}
-			}
-		} else {
-			letf.Println("error read", ultravnc)
-		}
+		opts = options(append(opts, port))
 	default:
 		opts = append(opts, port)
 	}

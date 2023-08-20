@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"strconv"
@@ -138,14 +137,14 @@ func serverLAN(args ...string) {
 	}
 }
 
-func dial(dest string) error {
-	conn, err := net.Dial("tcp", dest)
-	if err != nil {
-		return srcError(err)
-	}
-	conn.Close()
-	return err
-}
+// func dial(dest string) error {
+// 	conn, err := net.Dial("tcp", dest)
+// 	if err != nil {
+// 		return srcError(err)
+// 	}
+// 	conn.Close()
+// 	return err
+// }
 
 func hp(host, ps string) (hostPort, port string, ok bool) {
 	switch {

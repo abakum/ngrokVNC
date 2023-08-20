@@ -88,18 +88,22 @@ func server(args ...string) {
 		}
 	case "UltraVNC":
 		AcceptRfbConnections = true
-		ini.PrettyFormat = false
 		iniFile, err := ini.LoadSources(ini.LoadOptions{
 			IgnoreInlineComment: true,
 		}, ultravnc)
 		if err == nil {
 			section := iniFile.Section("admin")
 			AcceptRfbConnections = section.Key("SocketConnect").String() == "1"
-
+			if NGROK_API_KEY == "" {
+				UseDSMPlugin = "0"
+			}
 			if SetValue(section, "PortNumber", portRFB) ||
+				SetValue(section, "UseDSMPlugin", UseDSMPlugin) ||
 				SetValue(section, "AutoPortSelect", "0") ||
 				SetValue(section, "AllowLoopback", "1") ||
-				SetValue(section, "LoopbackOnly", "0") {
+				SetValue(section, "LoopbackOnly", "0") ||
+				false {
+				ini.PrettyFormat = false
 				err = iniFile.SaveTo(ultravnc)
 				if err != nil {
 					letf.Println("error write", ultravnc)
@@ -388,25 +392,10 @@ func handleConn(ctx context.Context, dest string, conn net.Conn) error {
 	return g.Wait()
 }
 
-// func taskList(fi string) string {
-// 	var (
-// 		bBuffer bytes.Buffer
-// 	)
-// 	list := exec.Command(
-// 		"tasklist",
-// 		"/nh",
-// 		"/fi",
-// 		fi,
-// 	)
-// 	list.Stdout = &bBuffer
-// 	list.Stderr = &bBuffer
-// 	err := list.Run()
-// 	if err != nil {
-// 		PrintOk(cmd("Run", list), err)
-// 		return ""
-// 	}
-// 	return bBuffer.String()
-// }
+func taskList(fi string) string {
+	bBuffer := tl(fi)
+	return bBuffer.String()
+}
 
 func tl(fi string) (bBuffer bytes.Buffer) {
 	list := exec.Command(
@@ -494,10 +483,10 @@ func p5ixx(key, val string, i int) {
 		return
 	}
 	s50 := strconv.Itoa(50 + i)
-	bBufferTL := tl(key + " eq " + val)
+	bBuffer := tl(key + " eq " + val)
 	all := ns("-a")
 	for {
-		line, err := bBufferTL.ReadString('\n')
+		line, err := bBuffer.ReadString('\n')
 		if err != nil {
 			return
 		}
@@ -541,8 +530,7 @@ func ll() {
 		if xVNC["server"] == "" {
 			continue
 		}
-		bBuffer := tl("services eq " + xVNC["services"])
-		localListen = strings.Contains(bBuffer.String(), xVNC["server"])
+		localListen = strings.Contains(taskList("services eq "+xVNC["services"]), xVNC["server"])
 		if localListen {
 			control = "-controlservice"
 			k = registry.LOCAL_MACHINE
@@ -651,12 +639,17 @@ func setCommandLine(serviceCommandLine string) {
 	if ultravnc == "" {
 		return
 	}
+	if NGROK_API_KEY == "" {
+		UseDSMPlugin = "0"
+	}
 	iniFile, err := ini.LoadSources(ini.LoadOptions{
 		IgnoreInlineComment: true,
 	}, ultravnc)
 	if err == nil {
 		section := iniFile.Section("admin")
-		if SetValue(section, "service_commandline", serviceCommandLine) || reload {
+		if SetValue(section, "service_commandline", serviceCommandLine) ||
+			SetValue(section, "UseDSMPlugin", UseDSMPlugin) ||
+			reload {
 			err = iniFile.SaveTo(ultravnc)
 			if err != nil {
 				letf.Println("error write", ultravnc)

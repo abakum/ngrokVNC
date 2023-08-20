@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows/registry"
+	"gopkg.in/ini.v1"
 )
 
 const (
@@ -76,9 +77,12 @@ var (
 	forwardsTo,
 	listen,
 	inLAN,
+	LAN,
 	ip,
 	ifs,
-	ultravnc string
+	ultravnc,
+	DSMPlugin string
+	UseDSMPlugin         = "0"
 	id                   = "0"
 	AcceptRfbConnections = true
 	proxy,
@@ -101,8 +105,7 @@ func main() {
 	}
 	executable, _ := os.Executable()
 	imagename := filepath.Base(executable)
-	bBuffer := tl("imagename eq " + imagename)
-	first = strings.Count(bBuffer.String(), imagename) == 1
+	first = strings.Count(taskList("imagename eq "+imagename), imagename) == 1
 
 	ips = interfaces()
 	if len(ips) == 0 {
@@ -155,8 +158,18 @@ func main() {
 	viewerExe = filepath.Join(VNC["path"], VNC["viewer"])
 	if VNC["name"] == "UltraVNC" {
 		ultravnc = filepath.Join(VNC["path"], "ultravnc.ini")
+		iniFile, err := ini.Load(ultravnc)
+		if err == nil {
+			section := iniFile.Section("admin")
+			DSMPlugin = section.Key("DSMPlugin").String()
+			if section.Key("UseDSMPlugin").String() == "1" && DSMPlugin != "" {
+				UseDSMPlugin = "1"
+			}
+		} else {
+			letf.Println("error read", ultravnc)
+		}
 		keyFN = filepath.Join(VNC["path"], keyFN)
-		_, err := os.Stat(keyFN)
+		_, err = os.Stat(keyFN)
 		if err != nil {
 			PrintOk(keyFN, os.WriteFile(keyFN, pkey, 0666))
 		}
@@ -166,7 +179,7 @@ func main() {
 	// NGROK_AUTHTOKEN += "-"                                       // emulate bad token or no internet
 	// NGROK_AUTHTOKEN = ""                                   // emulate local mode
 	NGROK_API_KEY = Getenv("NGROK_API_KEY", NGROK_API_KEY)
-	// NGROK_API_KEY = ""
+	// NGROK_API_KEY = "" // emulate no crypt
 
 	args := os.Args[:]
 	for k, v := range args {
