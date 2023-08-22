@@ -30,9 +30,9 @@ func viewer(args ...string) {
 		// pressEnter()
 	})
 
-	// host[::port] [password] as LAN viewer connect mode
+	// host[::port] [password] as LAN viewer connect mode no crypt
 	// host[:display] [password] as LAN viewer connect mode
-	// :host[::port] [password] as ngrok~proxy~IP viewer connect mode
+	// :host[::port] [password] as ngrok~proxy~IP viewer connect mode no crypt
 	// :host[:display] [password] as ngrok~proxy~IP viewer connect mode
 	// : [password] as ngrok viewer connect mode
 	// host as host: as host:0 as host:: as host::5900
@@ -41,18 +41,19 @@ func viewer(args ...string) {
 		host = abs(args[1])
 		if strings.HasPrefix(host, ":") {
 			proxy = host != ":" && NGROK_API_KEY != "" && VNC["name"] != "TightVNC"
-			// host, _, _ = hp(strings.TrimPrefix(host, ":"), portRFB)
 			host = strings.TrimPrefix(host, ":")
 		}
 	}
 
 	opts := []string{}
 	via := []string{"LAN", "LAN"}
-	LAN := host != "" || NGROK_API_KEY == ""
+	LAN := host != "" || NGROK_AUTHTOKEN == ""
 	if LAN {
 		if !proxy {
 			NGROK_AUTHTOKEN = "" // no ngrok
-			NGROK_API_KEY = ""
+			if strings.Contains(host, "::") {
+				NGROK_API_KEY = "" // no crypt
+			}
 		}
 		h, _, _ := hp(host, portRFB)
 		opts = append(opts, h)
@@ -79,10 +80,20 @@ func viewer(args ...string) {
 		}
 		if tcp != nil {
 			opts = append(opts, strings.Replace(tcp.Host, ":", "::", 1))
+		} else {
+			letf.Println("no proxy to view")
+			return
 		}
 	}
 	li.Printf("The VNC viewer connects to the waiting VNC server via %s - наблюдатель VNC подключается к ожидающему экрану VNC через %s\n", via[0], via[1])
 
+	if VNC["name"] == "UltraVNC" {
+		opts = options(opts)
+	}
+	if len(opts) < 1 {
+		letf.Println("no host to view")
+		return
+	}
 	if len(args) > 2 {
 		switch VNC["name"] {
 		case "TightVNC":
@@ -92,9 +103,6 @@ func viewer(args ...string) {
 			opts = append(opts, "-password")
 			opts = append(opts, args[2])
 		}
-	}
-	if VNC["name"] == "UltraVNC" {
-		opts = options(opts)
 	}
 	viewer := exec.Command(viewerExe, opts...)
 	viewer.Dir = filepath.Dir(viewer.Path)
@@ -122,16 +130,15 @@ func options(o []string) (opts []string) {
 		UseDSMPlugin = "0"
 	}
 	vnc := filepath.Join(VNC["path"], "options.vnc")
+	ini.PrettyFormat = false
 	iniFile, err := ini.Load(vnc)
 	if err == nil {
 		section := iniFile.Section("options")
-		if SetValue(section, "UseDSMPlugin", UseDSMPlugin) ||
-			SetValue(section, "DSMPlugin", DSMPlugin) ||
-			SetValue(section, "RequireEncryption", UseDSMPlugin) ||
-			SetValue(section, "AllowUntrustedServers", "0") ||
-			SetValue(section, "showtoolbar", "0") ||
-			false {
-			ini.PrettyFormat = false
+		ok := SetValue(section, "UseDSMPlugin", UseDSMPlugin)
+		ok = SetValue(section, "DSMPlugin", DSMPlugin) || ok
+		ok = SetValue(section, "RequireEncryption", UseDSMPlugin) || ok
+		ok = SetValue(section, "showtoolbar", "0") || ok
+		if ok {
 			err = iniFile.SaveTo(vnc)
 			if err != nil {
 				letf.Println("error write", vnc)

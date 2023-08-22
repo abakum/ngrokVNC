@@ -77,7 +77,6 @@ var (
 	forwardsTo,
 	listen,
 	inLAN,
-	LAN,
 	ip,
 	ifs,
 	ultravnc,
@@ -94,9 +93,10 @@ var (
 	plus2,
 	reload,
 	first bool
-	k   registry.Key
-	tcp *url.URL
-	ips []string
+	k       registry.Key
+	tcp     *url.URL
+	ips     []string
+	servers int
 )
 
 func main() {
@@ -156,13 +156,15 @@ func main() {
 	li.Println(VNC["name"], VNC["path"])
 	serverExe = filepath.Join(VNC["path"], VNC["server"])
 	viewerExe = filepath.Join(VNC["path"], VNC["viewer"])
+	servers = strings.Count(taskList("imagename eq "+VNC["server"]), VNC["server"])
+	// letf.Println("servers", servers)
 	if VNC["name"] == "UltraVNC" {
 		ultravnc = filepath.Join(VNC["path"], "ultravnc.ini")
 		iniFile, err := ini.Load(ultravnc)
 		if err == nil {
 			section := iniFile.Section("admin")
 			DSMPlugin = section.Key("DSMPlugin").String()
-			if section.Key("UseDSMPlugin").String() == "1" && DSMPlugin != "" {
+			if DSMPlugin != "" { //section.Key("UseDSMPlugin").String() == "1" &&
 				UseDSMPlugin = "1"
 			}
 		} else {
@@ -175,9 +177,9 @@ func main() {
 		}
 	}
 
-	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //if emty then local mode
+	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //if emty then LAN mode
 	// NGROK_AUTHTOKEN += "-"                                       // emulate bad token or no internet
-	// NGROK_AUTHTOKEN = ""                                   // emulate local mode
+	// NGROK_AUTHTOKEN = ""                                   // emulate LAN mode
 	NGROK_API_KEY = Getenv("NGROK_API_KEY", NGROK_API_KEY)
 	// NGROK_API_KEY = "" // emulate no crypt
 
@@ -192,7 +194,7 @@ func main() {
 		p5ixx("services", "repeater_service", 5)
 	}
 	publicURL, forwardsTo, errC = ngrokAPI(NGROK_API_KEY)
-	if errC == nil && strings.HasPrefix(forwardsTo, ifs) && !first {
+	if !first && (strings.HasPrefix(forwardsTo, ifs) || errC != nil) && vh(args) {
 		letf.Println("loop detected")
 		return
 	}
@@ -290,10 +292,10 @@ func main() {
 }
 
 func abs(s string) string {
-	if strings.HasPrefix(s, "-") {
+	if strings.HasPrefix(s, "-") || (plus && !rProxy) {
 		NGROK_AUTHTOKEN = "" // no ngrok
 		NGROK_API_KEY = ""   // no crypt
-		return strings.TrimPrefix(s, "-")
+		return s[1:]
 	}
 	return s
 }
@@ -327,4 +329,17 @@ func usage() {
 	li.Println("\tTo view via ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти")
 	li.Println("\t`ngrokVNC 0`")
 	li.Println("--------------------------------------------><8")
+}
+
+func vh(args []string) bool {
+	if len(args) < 2 {
+		return true
+	}
+	parts := strings.Split(args[1], ".")
+	if len(parts) != 4 {
+		return true
+	}
+	parts[0] = strings.TrimPrefix(parts[0], ":")
+	parts[3] = strings.Split(parts[3], ":")[0]
+	return strings.Contains(ifs, strings.Join(parts, "."))
 }
