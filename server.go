@@ -41,7 +41,7 @@ func server(args ...string) {
 	})
 
 	if len(args) > 1 {
-		_, portRFB, reload = hp(args[1], portRFB)
+		_, portRFB, reload = hp(abs(args[1]), portRFB)
 	} else {
 		reload = portRFB != CportRFB
 		portRFB = CportRFB
@@ -88,6 +88,7 @@ func server(args ...string) {
 		}
 	case "UltraVNC":
 		AcceptRfbConnections = true
+		ini.PrettyFormat = false
 		iniFile, err := ini.LoadSources(ini.LoadOptions{
 			IgnoreInlineComment: true,
 		}, ultravnc)
@@ -97,13 +98,12 @@ func server(args ...string) {
 			if NGROK_API_KEY == "" {
 				UseDSMPlugin = "0"
 			}
-			if SetValue(section, "PortNumber", portRFB) ||
-				SetValue(section, "UseDSMPlugin", UseDSMPlugin) ||
-				SetValue(section, "AutoPortSelect", "0") ||
-				SetValue(section, "AllowLoopback", "1") ||
-				SetValue(section, "LoopbackOnly", "0") ||
-				false {
-				ini.PrettyFormat = false
+			ok := SetValue(section, "PortNumber", portRFB)
+			ok = SetValue(section, "UseDSMPlugin", UseDSMPlugin) || ok
+			ok = SetValue(section, "AutoPortSelect", "0") || ok
+			ok = SetValue(section, "AllowLoopback", "1") || ok
+			ok = SetValue(section, "LoopbackOnly", "0") || ok
+			if ok {
 				err = iniFile.SaveTo(ultravnc)
 				if err != nil {
 					letf.Println("error write", ultravnc)
@@ -128,9 +128,6 @@ func server(args ...string) {
 			setCommandLine("")
 		} else {
 			setCommandLine(fmt.Sprintf("-autoreconnect ID:%s -connect %s", id, connect))
-			// if rProxy {
-			// 	return
-			// }
 		}
 	} else {
 		opts := []string{}
@@ -140,6 +137,11 @@ func server(args ...string) {
 				"-connect",
 				connect,
 			)
+		} else {
+			if servers > 0 {
+				letf.Println("server already running")
+				return
+			}
 		}
 		sRun := exec.Command(serverExe, append(opts,
 			"-run",
@@ -176,6 +178,10 @@ func server(args ...string) {
 	}
 
 	if NGROK_AUTHTOKEN == "" {
+		li.Println("The VNC server is waiting for the VNC viewer to connect - экран VNC ожидает подключения VNC наблюдателя")
+		li.Println("\ton TCP port", portRFB)
+		li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
+		li.Printf("\t`ngrokVNC %s [password]`", hpd(ip, portRFB, CportRFB))
 		planB(Errorf("empty NGROK_AUTHTOKEN"), ":"+portRFB)
 		return
 	}
@@ -619,6 +625,9 @@ func lPortViewer(port int) int {
 }
 func hpd(h, p, c string) string {
 	if p == c {
+		if plus && localListen {
+			return h + "::"
+		}
 		return h
 	}
 	return h + "::" + p
@@ -642,14 +651,16 @@ func setCommandLine(serviceCommandLine string) {
 	if NGROK_API_KEY == "" {
 		UseDSMPlugin = "0"
 	}
+	ini.PrettyFormat = false
 	iniFile, err := ini.LoadSources(ini.LoadOptions{
 		IgnoreInlineComment: true,
 	}, ultravnc)
 	if err == nil {
 		section := iniFile.Section("admin")
-		if SetValue(section, "service_commandline", serviceCommandLine) ||
-			SetValue(section, "UseDSMPlugin", UseDSMPlugin) ||
-			reload {
+		ok := reload
+		ok = SetValue(section, "service_commandline", serviceCommandLine) || ok
+		ok = SetValue(section, "UseDSMPlugin", UseDSMPlugin) || ok
+		if ok {
 			err = iniFile.SaveTo(ultravnc)
 			if err != nil {
 				letf.Println("error write", ultravnc)
