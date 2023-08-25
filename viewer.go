@@ -46,7 +46,9 @@ func viewer(args ...string) {
 	}
 
 	via := []string{"LAN", "LAN"}
-	LAN := host != "" || NGROK_AUTHTOKEN == ""
+	LAN := host != "" ||
+		// emulate LAN mode?
+		NGROK_AUTHTOKEN == ""
 	if LAN {
 		if !proxy {
 			if strings.Contains(host, "::") {
