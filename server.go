@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"net/netip"
-	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -23,22 +22,14 @@ import (
 )
 
 func server(args ...string) {
+	defer closer.Close()
+	closer.Bind(func() {
+		setCommandLine("")
+		cleanup()
+	})
+
 	ltf.Println(args)
 	li.Printf("\"%s\" {+[id]|[::port]}\n", args[0])
-
-	var (
-		err error
-	)
-	defer closer.Close()
-
-	closer.Bind(func() {
-		if err != nil {
-			let.Println(err)
-			defer os.Exit(1)
-		}
-		setCommandLine("")
-		// pressEnter()
-	})
 
 	if len(args) > 1 {
 		_, portRFB, reload = hp(abs(args[1]), portRFB)
@@ -46,10 +37,7 @@ func server(args ...string) {
 		reload = portRFB != CportRFB
 		portRFB = CportRFB
 	}
-	letf.Println("reload", reload, portRFB)
 	ll()
-
-	opts := []string{}
 
 	switch VNC["name"] {
 	case "TightVNC":
@@ -57,60 +45,58 @@ func server(args ...string) {
 
 		key := `SOFTWARE\TightVNC\Server`
 		k, err = registry.OpenKey(k, key, registry.QUERY_VALUE|registry.SET_VALUE)
-		if err == nil {
-			AcceptRfbConnections = GetBoolValue(k, "AcceptRfbConnections")
-			key = "RfbPort"
-			old, _, err := k.GetIntegerValue(key)
-			if reload {
-				RfbPort, err := strconv.Atoi(portRFB)
-				if old != uint64(RfbPort) || err != nil {
-					PrintOk(key, k.SetDWordValue(key, uint32(RfbPort)))
-					if localListen {
-						reload := exec.Command(
-							serverExe,
-							control,
-							"-reload",
-						)
-						PrintOk(cmd("Run", reload), reload.Run())
-						p5ixx("imagename", VNC["server"], 9)
-					}
-				}
-			} else {
-				if err == nil {
-					portRFB = fmt.Sprintf("%d", old)
+		if err != nil {
+			err = srcError(err)
+			return
+		}
+		AcceptRfbConnections = GetBoolValue(k, "AcceptRfbConnections")
+		key = "RfbPort"
+		old, _, er := k.GetIntegerValue(key)
+		if reload {
+			RfbPort, er := strconv.Atoi(portRFB)
+			if old != uint64(RfbPort) || er != nil {
+				PrintOk(key, k.SetDWordValue(key, uint32(RfbPort)))
+				if localListen {
+					reload := exec.Command(
+						serverExe,
+						control,
+						"-reload",
+					)
+					PrintOk(cmd("Run", reload), reload.Run())
+					p5ixx("imagename", VNC["server"], 9)
 				}
 			}
-			SetDWordValue(k, "AllowLoopback", 1)
-			SetDWordValue(k, "LoopbackOnly", 0)
-			k.Close()
 		} else {
-			PrintOk(key, err)
+			if er == nil {
+				portRFB = fmt.Sprintf("%d", old)
+			}
 		}
+		SetDWordValue(k, "AllowLoopback", 1)
+		SetDWordValue(k, "LoopbackOnly", 0)
+		k.Close()
 	case "UltraVNC":
 		AcceptRfbConnections = true
 		ini.PrettyFormat = false
-		iniFile, err := ini.LoadSources(ini.LoadOptions{
+		iniFile, err = ini.LoadSources(ini.LoadOptions{
 			IgnoreInlineComment: true,
 		}, ultravnc)
-		if err == nil {
-			section := iniFile.Section("admin")
-			AcceptRfbConnections = section.Key("SocketConnect").String() == "1"
-			if NGROK_API_KEY == "" {
-				UseDSMPlugin = "0"
+		if err != nil {
+			err = srcError(err)
+			return
+		}
+		section := iniFile.Section("admin")
+		AcceptRfbConnections = section.Key("SocketConnect").String() == "1"
+		ok := SetValue(section, "PortNumber", portRFB)
+		ok = SetValue(section, "UseDSMPlugin", UseDSMPlugin) || ok
+		ok = SetValue(section, "AutoPortSelect", "0") || ok
+		ok = SetValue(section, "AllowLoopback", "1") || ok
+		ok = SetValue(section, "LoopbackOnly", "0") || ok
+		if ok {
+			err = iniFile.SaveTo(ultravnc)
+			if err != nil {
+				err = srcError(err)
+				return
 			}
-			ok := SetValue(section, "PortNumber", portRFB)
-			ok = SetValue(section, "UseDSMPlugin", UseDSMPlugin) || ok
-			ok = SetValue(section, "AutoPortSelect", "0") || ok
-			ok = SetValue(section, "AllowLoopback", "1") || ok
-			ok = SetValue(section, "LoopbackOnly", "0") || ok
-			if ok {
-				err = iniFile.SaveTo(ultravnc)
-				if err != nil {
-					letf.Println("error write", ultravnc)
-				}
-			}
-		} else {
-			letf.Println("error read", ultravnc)
 		}
 	}
 
@@ -125,9 +111,13 @@ func server(args ...string) {
 	}
 	if localListen {
 		if connect == "" {
-			setCommandLine("")
+			err = setCommandLine("")
 		} else {
-			setCommandLine(fmt.Sprintf("-autoreconnect ID:%s -connect %s", id, connect))
+			err = setCommandLine(fmt.Sprintf("-autoreconnect ID:%s -connect %s", id, connect))
+		}
+		if err != nil {
+			err = srcError(err)
+			return
 		}
 	} else {
 		opts := []string{}
@@ -139,7 +129,7 @@ func server(args ...string) {
 			)
 		} else {
 			if servers > 0 {
-				letf.Println("server already running")
+				err = srcError(fmt.Errorf("VNC server already running - VNC экран уже запущен"))
 				return
 			}
 		}
@@ -186,26 +176,26 @@ func server(args ...string) {
 		return
 	}
 
-	if RportViewer > 0 && RportRFB == "" { //&& !rProxy
+	if RportViewer > 0 && RportRFB == "" && tcp != "" { //&& !rProxy
 		li.Println("On the other side was launched - на другой стороне был запушен")
 		li.Printf("`ngrokVNC %d`", RportViewer-CportViewer)
 		li.Println("On the other side the VNC viewer is waiting for the VNC server to be connected via ngrok - на другой стороне наблюдатель VNC ожидает подключения VNC экрана через туннель")
 		li.Println("The VNC server connects to the waiting VNC viewer via ngrok - экран VNC подключается к ожидающему VNC наблюдателю через туннель")
-		tcp, err := url.Parse(publicURL)
-		host := strings.Replace(publicURL, "tcp://", "", 1)
-		if err == nil {
-			host = tcp.Host
-		}
-		host = strings.Replace(host, ":", "::", 1)
 		if localListen {
-			setCommandLine(fmt.Sprintf("-autoreconnect -connect %s", host))
+			err = setCommandLine(autoreconnect(tcp))
+			if err != nil {
+				err = srcError(err)
+				return
+			}
 		} else {
-			if VNC["name"] == "UltraVNC" {
-				opts = append(opts, "-autoreconnect")
+			err = setCommandLine("")
+			if err != nil {
+				err = srcError(err)
+				return
 			}
 			sConnect := exec.Command(serverExe, append(opts,
 				"-connect",
-				host,
+				tcp,
 			)...)
 			sConnect.Stdout = os.Stdout
 			sConnect.Stderr = os.Stderr
@@ -218,7 +208,6 @@ func server(args ...string) {
 			PrintOk(cmd("Run", sConnect), sConnect.Run())
 			closer.Hold()
 		}
-		// return
 	}
 	switch {
 	case proxy || plus || rProxy:
@@ -280,19 +269,13 @@ func interfaces() (ifs []string) {
 }
 func planB(err error, dest string) {
 	if !AcceptRfbConnections {
-		letf.Println("no accept connections")
+		letf.Println("no accept connections - подключения запрещены")
 		return
 	}
-	s := "LAN mode - режим локальной сети"
-
 	let.Println(err)
-	if len(ips) > 0 {
-		li.Println(s)
-		li.Println(ifs)
-		watch(dest)
-	} else {
-		letf.Println("no ifaces for server")
-	}
+	li.Println("LAN mode - режим локальной сети")
+	li.Println(ifs)
+	watch(dest)
 }
 
 func watch(dest string) {
@@ -624,14 +607,24 @@ func lPortViewer(port int) int {
 	return port
 }
 func hpd(h, p, c string) string {
-	if p == c {
-		if plus && localListen {
+	if UseDSMPlugin == "0" {
+		if p == c {
 			return h + "::"
 		}
-		return h
+		return h + "::" + p
+	} else {
+		if p == c {
+			return h
+		}
+		Ip, er := strconv.Atoi(p)
+		Cp, _ := strconv.Atoi(c)
+		if er != nil {
+			Ip = Cp
+		}
+		return fmt.Sprintf("%s:%d", h, Ip-Cp)
 	}
-	return h + "::" + p
 }
+
 func withForwardsTo(lPort string) (meta string) {
 	meta = ifs + lPort
 	if proxy {
@@ -644,52 +637,60 @@ func withForwardsTo(lPort string) (meta string) {
 	return
 }
 
-func setCommandLine(serviceCommandLine string) {
+func setCommandLine(serviceCommandLine string) (err error) {
 	if ultravnc == "" {
 		return
 	}
-	if NGROK_API_KEY == "" {
-		UseDSMPlugin = "0"
-	}
 	ini.PrettyFormat = false
-	iniFile, err := ini.LoadSources(ini.LoadOptions{
+	iniFile, err = ini.LoadSources(ini.LoadOptions{
 		IgnoreInlineComment: true,
 	}, ultravnc)
-	if err == nil {
-		section := iniFile.Section("admin")
-		ok := reload
-		ok = SetValue(section, "service_commandline", serviceCommandLine) || ok
-		ok = SetValue(section, "UseDSMPlugin", UseDSMPlugin) || ok
-		if ok {
-			err = iniFile.SaveTo(ultravnc)
-			if err != nil {
-				letf.Println("error write", ultravnc)
-			} else {
-				if localListen {
-					stop := exec.Command(
-						"net",
-						"stop",
-						VNC["services"])
-					// stop := exec.Command(serverExe, "-stopservice")
-					stop.Stdout = os.Stdout
-					stop.Stderr = os.Stderr
-					PrintOk(cmd("Run", stop), stop.Run())
-					time.Sleep(time.Second)
-
-					start := exec.Command(
-						"net",
-						"start",
-						VNC["services"])
-					// start := exec.Command(serverExe, "-startservice")
-					start.Stdout = os.Stdout
-					start.Stderr = os.Stderr
-					PrintOk(cmd("Run", start), start.Run())
-					time.Sleep(time.Second)
-				}
-				p5ixx("imagename", VNC["server"], 9)
-			}
-		}
-	} else {
-		letf.Println("error read", ultravnc)
+	if err != nil {
+		return
 	}
+	section := iniFile.Section("admin")
+	ok := reload
+	ok = SetValue(section, "service_commandline", serviceCommandLine) || ok
+	ok = SetValue(section, "UseDSMPlugin", UseDSMPlugin) || ok
+	if ok {
+		err = iniFile.SaveTo(ultravnc)
+		if err != nil {
+			return
+		}
+		if localListen {
+			stop := exec.Command(
+				"net",
+				"stop",
+				VNC["services"])
+			// stop := exec.Command(serverExe, "-stopservice")
+			stop.Stdout = os.Stdout
+			stop.Stderr = os.Stderr
+			PrintOk(cmd("Run", stop), stop.Run())
+			time.Sleep(time.Second)
+
+			start := exec.Command(
+				"net",
+				"start",
+				VNC["services"])
+			// start := exec.Command(serverExe, "-startservice")
+			start.Stdout = os.Stdout
+			start.Stderr = os.Stderr
+			PrintOk(cmd("Run", start), start.Run())
+			time.Sleep(time.Second)
+		}
+		p5ixx("imagename", VNC["server"], 9)
+	}
+	return
+}
+
+func autoreconnect(tcp string) (a string) {
+	a = "-autoreconnect"
+	if VNC["name"] == "UltraVNC" {
+		opts = append(opts, a)
+		a += " "
+	} else {
+		a = ""
+	}
+	a += "-connect " + tcp
+	return
 }

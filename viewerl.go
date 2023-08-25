@@ -13,20 +13,11 @@ import (
 )
 
 func viewerl(args ...string) {
+	defer closer.Close()
+	closer.Bind(cleanup)
+
 	ltf.Println(args)
 	li.Printf("\"%s\" [-]port [password]\n", args[0])
-	var (
-		err error
-	)
-	defer closer.Close()
-
-	closer.Bind(func() {
-		if err != nil {
-			let.Println(err)
-			defer os.Exit(1)
-		}
-		// pressEnter()
-	})
 
 	// -port as LAN viewer listen mode
 	// port as ngrok viewer listen mode
@@ -41,15 +32,14 @@ func viewerl(args ...string) {
 			}
 		}
 		if strings.HasPrefix(args[1], "-") {
-
 			li.Println("The VNC viewer is waiting for the VNC server to be connected via LAN - наблюдатель VNC ожидает подключения VNC экрана через LAN")
 			li.Println("\ton TCP port", portViewer)
 			li.Println("\tTo view via LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
 			if i == 0 {
-				li.Println("\t`ngrokVNC -host`")
+				li.Printf("\t`ngrokVNC -%s::`", ip)
 
 			} else {
-				li.Printf("\t`ngrokVNC -host:%d`", i)
+				li.Printf("\t`ngrokVNC -%s::%d`", ip, i+CportViewer)
 			}
 		} else {
 			li.Println("This will create a ngrok tunnel - это создаст туннель")
@@ -62,7 +52,7 @@ func viewerl(args ...string) {
 	portViewer = 0
 	p5ixx("imagename", VNC["viewer"], 5)
 	if portViewer > 0 {
-		letf.Println(VNC["viewer"], "alredy listen on", portViewer)
+		letf.Println(VNC["viewer"], "alredy listen on - уже слушает", portViewer)
 		localListen = portViewer == OportViewer
 		if !localListen {
 			killViewer := exec.Command("taskKill", "/f", "/im", VNC["viewer"])
@@ -73,7 +63,7 @@ func viewerl(args ...string) {
 	}
 	portViewer = OportViewer
 
-	opts := []string{"-listen"}
+	opts = append(opts, "-listen")
 	port := strconv.Itoa(portViewer)
 
 	switch VNC["name"] {
@@ -128,7 +118,7 @@ func viewerl(args ...string) {
 		return
 	}
 
-	if errC == nil {
+	if errNgrokAPI == nil {
 		planB(Errorf("found online client: %s", forwardsTo), port)
 		return
 	}

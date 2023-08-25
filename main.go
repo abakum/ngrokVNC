@@ -2,13 +2,16 @@ package main
 
 import (
 	_ "embed"
+	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/xlab/closer"
 	"golang.org/x/sys/windows/registry"
 	"gopkg.in/ini.v1"
 )
@@ -26,8 +29,9 @@ var (
 	//go:embed uvnc.pkey.txt
 	pkey []byte
 
-	keyFN       = "20230722_Viewer_ClientAuth.pkey"
-	errC        error
+	keyFN = "20230722_Viewer_ClientAuth.pkey"
+	err,
+	errNgrokAPI error
 	TO          = time.Second * 60
 	portRFB     = CportRFB
 	portViewer  = CportViewer
@@ -74,13 +78,15 @@ var (
 	control,
 	connect,
 	publicURL,
+	tcp,
 	forwardsTo,
 	listen,
 	inLAN,
 	ip,
 	ifs,
 	ultravnc,
-	DSMPlugin string
+	DSMPlugin,
+	new string
 	UseDSMPlugin         = "0"
 	id                   = "0"
 	AcceptRfbConnections = true
@@ -94,43 +100,61 @@ var (
 	reload,
 	first bool
 	k       registry.Key
-	tcp     *url.URL
 	ips     []string
 	servers int
+	opts    = []string{}
+	sRun,
+	shutdown,
+	cont,
+	sConnect *exec.Cmd
+	iniFile *ini.File
 )
 
 func main() {
+	var (
+		executable,
+		cwd string
+	)
+	defer closer.Close()
+	closer.Bind(cleanup)
+
 	if len(os.Args) == 1 {
 		usage()
 	}
-	executable, _ := os.Executable()
+	executable, err = os.Executable()
+	if err != nil {
+		err = srcError(err)
+		return
+	}
 	imagename := filepath.Base(executable)
 	first = strings.Count(taskList("imagename eq "+imagename), imagename) == 1
 
 	ips = interfaces()
 	if len(ips) == 0 {
-		letf.Println("not connected")
+		err = srcError(fmt.Errorf("not connected - нет сети"))
 		return
 	}
 	ifs = strings.Join(ips, ",")
 
-	cwd, err := os.Getwd()
-	if err == nil {
-		for _, xVNC := range VNCs {
-			xVNC["path"] = filepath.Join(cwd, "..", xVNC["name"])
-			if stat, err := os.Stat(xVNC["path"]); err == nil && stat.IsDir() {
-				VNC = xVNC
-				break
-			}
+	cwd, err = os.Getwd()
+	if err != nil {
+		err = srcError(err)
+		return
+	}
+	for _, xVNC := range VNCs {
+		xVNC["path"] = filepath.Join(cwd, "..", xVNC["name"])
+		if stat, err := os.Stat(xVNC["path"]); err == nil && stat.IsDir() {
+			VNC = xVNC
+			break
 		}
 	}
 
 	key := `SOFTWARE\Classes\VncViewer.Config\DefaultIcon`
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, key, registry.QUERY_VALUE|registry.SET_VALUE)
-	key = ""
-	if err == nil {
-		old, _, err := k.GetStringValue(key)
-		if err == nil {
+	k, er := registry.OpenKey(registry.LOCAL_MACHINE, key, registry.QUERY_VALUE|registry.SET_VALUE)
+	if er == nil {
+		key = ""
+		old, _, er := k.GetStringValue(key)
+		if er == nil {
 			for _, xVNC := range VNCs {
 				if !strings.Contains(old, xVNC["name"]) {
 					continue
@@ -143,45 +167,45 @@ func main() {
 				}
 			}
 		} else {
-			PrintOk(key, err)
+			PrintOk(key, er)
 		}
 		k.Close()
 	} else {
-		PrintOk(key, err)
+		PrintOk(key, er)
 	}
+
 	if VNC["path"] == "" {
-		letf.Println("not found VNC viewer")
+		err = srcError(fmt.Errorf("not found VNC viewer - не найден VNC наблюдатель"))
 		return
 	}
+
 	li.Println(VNC["name"], VNC["path"])
 	serverExe = filepath.Join(VNC["path"], VNC["server"])
 	viewerExe = filepath.Join(VNC["path"], VNC["viewer"])
 	servers = strings.Count(taskList("imagename eq "+VNC["server"]), VNC["server"])
-	// letf.Println("servers", servers)
 	if VNC["name"] == "UltraVNC" {
 		ultravnc = filepath.Join(VNC["path"], "ultravnc.ini")
-		iniFile, err := ini.Load(ultravnc)
-		if err == nil {
-			section := iniFile.Section("admin")
-			DSMPlugin = section.Key("DSMPlugin").String()
-			if DSMPlugin != "" { //section.Key("UseDSMPlugin").String() == "1" &&
-				UseDSMPlugin = "1"
-			}
-		} else {
-			letf.Println("error read", ultravnc)
+		iniFile, err = ini.Load(ultravnc)
+		if err != nil {
+			err = srcError(err)
+			return
+		}
+		section := iniFile.Section("admin")
+		DSMPlugin = section.Key("DSMPlugin").String()
+		if DSMPlugin != "" {
+			UseDSMPlugin = "1"
 		}
 		keyFN = filepath.Join(VNC["path"], keyFN)
-		_, err = os.Stat(keyFN)
-		if err != nil {
+		_, er = os.Stat(keyFN)
+		if er != nil {
 			PrintOk(keyFN, os.WriteFile(keyFN, pkey, 0666))
 		}
 	}
 
-	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //if emty then LAN mode
+	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //create ngrok
 	// NGROK_AUTHTOKEN += "-"                                       // emulate bad token or no internet
-	// NGROK_AUTHTOKEN = ""                                   // emulate LAN mode
-	NGROK_API_KEY = Getenv("NGROK_API_KEY", NGROK_API_KEY)
-	// NGROK_API_KEY = "" // emulate no crypt
+	// NGROK_AUTHTOKEN = ""                                         // emulate LAN mode
+	NGROK_API_KEY = Getenv("NGROK_API_KEY", NGROK_API_KEY) //use ngrok
 
 	args := os.Args[:]
 	for k, v := range args {
@@ -193,32 +217,28 @@ func main() {
 	if proxy {
 		p5ixx("services", "repeater_service", 5)
 	}
-	publicURL, forwardsTo, errC = ngrokAPI(NGROK_API_KEY)
-	if !first && (strings.HasPrefix(forwardsTo, ifs) || errC != nil) && vh(args) {
-		letf.Println("loop detected")
+	publicURL, forwardsTo, errNgrokAPI = ngrokAPI(NGROK_API_KEY)
+	if (strings.HasPrefix(forwardsTo, ifs) || errNgrokAPI != nil) && vh(args) {
+		err = srcError(fmt.Errorf("loop detected - обнаружена петля"))
 		return
 	}
-	PrintOk(forwardsTo, errC)
+	PrintOk(forwardsTo, errNgrokAPI)
 
 	ip = strings.Split(ips[len(ips)-1], "/")[0]
-	if errC == nil {
-		tcp, err = url.Parse(publicURL)
-		if err != nil {
-			letf.Println(err)
-			return
-		}
+	if errNgrokAPI == nil {
+		tcp = url2host(publicURL)
 		connect, listen, inLAN = fromNgrok(forwardsTo)
-		letf.Println(connect, listen, inLAN)
+		ltf.Println(connect, listen, inLAN)
 		if rProxy {
 			plusS := "+"
 			if rProxy2 {
-				PrintOk("Is VNC proxyII listen - VNC проксиII ожидает подключения?", errC)
+				PrintOk("Is VNC proxyII listen - VNC проксиII ожидает подключения?", errNgrokAPI)
 				//192.168.0.2->19216802
 				id = "00000" + strings.ReplaceAll(ip, ".", "")
 				id = strings.Trim(id[len(id)-9:], "0")
 				plusS += id
 			} else {
-				PrintOk("Is VNC proxy listen - VNC прокси ожидает подключения?", errC)
+				PrintOk("Is VNC proxy listen - VNC прокси ожидает подключения?", errNgrokAPI)
 			}
 			if len(args) == 1 {
 				if inLAN != "" && first {
@@ -229,24 +249,29 @@ func main() {
 			}
 		} else {
 			if RportRFB != "" {
-				PrintOk("Is VNC server listen - VNC экран ожидает подключения?", errC)
+				PrintOk("Is VNC server listen - VNC экран ожидает подключения?", errNgrokAPI)
 				if len(args) == 1 {
 					if inLAN != "" {
-						args = append(args, listen) //viewer
+						args = append(args, hpd(listen, RportRFB, CportRFB)) //viewer
 					} else {
 						args = append(args, ":") //viewer
 					}
 				}
 			}
 			if RportViewer > 0 {
-				PrintOk("Is VNC viewer listen - VNC наблюдатель ожидает подключения?", errC)
+				PrintOk("Is VNC viewer listen - VNC наблюдатель ожидает подключения?", errNgrokAPI)
+				if len(args) == 1 {
+					if inLAN != "" {
+						args = append(args, fmt.Sprintf("-%s:%d", listen, RportViewer-CportViewer)) //serverLAN
+					}
+				}
 			}
 		}
 	}
 	if len(args) > 1 {
 		plus = strings.HasPrefix(args[1], "+")
-		i, err := strconv.Atoi(args[1])
-		if err != nil {
+		i, er := strconv.Atoi(args[1])
+		if er != nil {
 			switch {
 			case args[1] == "-":
 				// - try connect server to viewer via ngrok (revers)
@@ -258,13 +283,13 @@ func main() {
 				// :: as ::5900
 				server(args...)
 			default:
-				// host[::port] [password] as LAN viewer connect mode
-				// host[:display] [password] as LAN viewer connect mode
-				// :host[::port] [password] as ngrok~proxy~LAN viewer connect mode
-				// :host[:display] [password] as ngrok~proxy~LAN viewer connect mode
-				// :id[:123456789] [password] as ngrok~proxy~IP viewer connect mode
+				// host::port [password] as LAN viewer connect mode no crypt
+				// host[:display] [password] as LAN viewer connect mode crypt
+				// host as host: as host:0 as host:: as host::5900
+				// :host::port [password] as ngrok~proxy~IP viewer connect mode no crypt
+				// :host[:display] [password] as ngrok~proxy~IP viewer connect mode
+				// :id [password] as ngrok~proxy~ID viewer connect mode
 				// : [password] as ngrok viewer connect mode
-				// host as host:0 as host: as host::5900 as host::
 				proxy = false
 				proxy2 = false
 				viewer(args...)
@@ -274,7 +299,7 @@ func main() {
 		// -port as LAN viewer listen mode
 		// port as ngrok viewer listen mode
 		// 0  as 5500
-		//+id as server with proxy  -id:id
+		//+id as server with proxy -id:id
 		if plus {
 			plus2 = true
 			id = strconv.Itoa(i)
@@ -288,13 +313,15 @@ func main() {
 	}
 	// as GUI or reg RfbPort
 	server(args...)
-
 }
 
 func abs(s string) string {
 	if strings.HasPrefix(s, "-") || (plus && !rProxy) {
-		NGROK_AUTHTOKEN = "" // no ngrok
-		NGROK_API_KEY = ""   // no crypt
+		NGROK_AUTHTOKEN = "" // not create ngrok
+		NGROK_API_KEY = ""   // not use ngrok
+		if strings.Count(s, ":") != 1 {
+			UseDSMPlugin = "0"
+		}
 		return s[1:]
 	}
 	return s
@@ -333,13 +360,30 @@ func usage() {
 
 func vh(args []string) bool {
 	if len(args) < 2 {
-		return true
+		return !first
 	}
 	parts := strings.Split(args[1], ".")
 	if len(parts) != 4 {
-		return true
+		return !first
 	}
 	parts[0] = strings.TrimPrefix(parts[0], ":")
+	parts[0] = strings.TrimPrefix(parts[0], "-")
 	parts[3] = strings.Split(parts[3], ":")[0]
 	return strings.Contains(ifs, strings.Join(parts, "."))
+}
+
+func url2host(publicURL string) string {
+	tcp, err := url.Parse(publicURL)
+	host := strings.Replace(publicURL, "tcp://", "", 1)
+	if err == nil {
+		host = tcp.Host
+	}
+	return strings.Replace(host, ":", "::", 1)
+}
+
+func cleanup() {
+	if err != nil {
+		let.Println(err)
+		defer os.Exit(1)
+	}
 }

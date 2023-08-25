@@ -12,53 +12,52 @@ import (
 )
 
 func viewer(args ...string) {
-	ltf.Println(args)
-	li.Printf("\"%s\" {[:]host[::port]|[:]host[:display]|:id[:123456789]|:} [password]\n", args[0])
-	li.Println("On the other side should be running - на другой стороне должен быть запущен")
-	li.Println("`ngrokVNC [::port]`")
 	var (
-		err  error
 		host string
 	)
 	defer closer.Close()
+	closer.Bind(cleanup)
 
-	closer.Bind(func() {
-		if err != nil {
-			let.Println(err)
-			defer os.Exit(1)
-		}
-		// pressEnter()
-	})
+	ltf.Println(args)
+	li.Printf("\"%s\" {[:]host[::port]|[:]host[:display]|:id[:123456789]|:} [password]\n", args[0])
+	li.Println("On the other side may have been running - на другой стороне возможно был запущен")
+	switch {
+	case RportRFB == CportRFB:
+		li.Println("\t`ngrokVNC`")
+	case RportRFB != "":
+		li.Printf("\t`ngrokVNC ::%s`\n", RportRFB)
+	default:
+		li.Println("\t`ngrokVNC [::port]`")
+	}
 
-	// host[::port] [password] as LAN viewer connect mode no crypt
-	// host[:display] [password] as LAN viewer connect mode
-	// :host[::port] [password] as ngrok~proxy~IP viewer connect mode no crypt
-	// :host[:display] [password] as ngrok~proxy~IP viewer connect mode
-	// : [password] as ngrok viewer connect mode
-	// host as host: as host:0 as host:: as host::5900
-	// :id [password] as ngrok~proxy~ID viewer connect mode
 	if len(args) > 1 {
+		// host::port [password] as LAN viewer connect mode no crypt
+		// host[:display] [password] as LAN viewer connect mode crypt
+		// host as host: as host:0 as host:: as host::5900
 		host = abs(args[1])
 		if strings.HasPrefix(host, ":") {
-			proxy = host != ":" && NGROK_API_KEY != "" && VNC["name"] != "TightVNC"
+			// :host::port [password] as ngrok~proxy~IP viewer connect mode no crypt
+			// :host[:display] [password] as ngrok~proxy~IP viewer connect mode
+			// :id [password] as ngrok~proxy~ID viewer connect mode
+			// : [password] as ngrok viewer connect mode
+			proxy = host != ":" && errNgrokAPI == nil && VNC["name"] == "UltraVNC"
 			host = strings.TrimPrefix(host, ":")
 		}
 	}
 
-	opts := []string{}
 	via := []string{"LAN", "LAN"}
 	LAN := host != "" || NGROK_AUTHTOKEN == ""
 	if LAN {
 		if !proxy {
-			NGROK_AUTHTOKEN = "" // no ngrok
 			if strings.Contains(host, "::") {
-				NGROK_API_KEY = "" // no crypt
+				UseDSMPlugin = "0"
 			}
 		}
 		h, _, _ := hp(host, portRFB)
 		opts = append(opts, h)
 	}
 	if proxy || !LAN {
+		via = []string{"ngrok", "туннель"}
 		if proxy || rProxy {
 			if rProxy2 {
 				via = []string{"ngrok~proxy~ID", "туннель~прокси~ID"}
@@ -78,11 +77,10 @@ func viewer(args ...string) {
 				opts = append(opts, "-via")
 			}
 		}
-		if tcp != nil {
-			opts = append(opts, strings.Replace(tcp.Host, ":", "::", 1))
+		if tcp == "" {
+			err = srcError(fmt.Errorf("no proxy to view - нет прокси для наблюдателя"))
 		} else {
-			letf.Println("no proxy to view")
-			return
+			opts = append(opts, tcp)
 		}
 	}
 	li.Printf("The VNC viewer connects to the waiting VNC server via %s - наблюдатель VNC подключается к ожидающему экрану VNC через %s\n", via[0], via[1])
@@ -91,7 +89,9 @@ func viewer(args ...string) {
 		opts = options(opts)
 	}
 	if len(opts) < 1 {
-		letf.Println("no host to view")
+		err = srcError(fmt.Errorf("no host to view - нет адреса для наблюдателя"))
+	}
+	if err != nil {
 		return
 	}
 	if len(args) > 2 {
@@ -126,9 +126,6 @@ func cmd(s string, c *exec.Cmd) string {
 
 func options(o []string) (opts []string) {
 	opts = o[:]
-	if NGROK_API_KEY == "" {
-		UseDSMPlugin = "0"
-	}
 	vnc := filepath.Join(VNC["path"], "options.vnc")
 	ini.PrettyFormat = false
 	iniFile, err := ini.Load(vnc)
@@ -141,7 +138,7 @@ func options(o []string) (opts []string) {
 		if ok {
 			err = iniFile.SaveTo(vnc)
 			if err != nil {
-				letf.Println("error write", vnc)
+				letf.Println("error write - ошибка записи", vnc)
 			}
 		}
 	} else {
@@ -150,7 +147,7 @@ func options(o []string) (opts []string) {
 			opts = append(opts, "-DSMPlugin")
 			opts = append(opts, DSMPlugin)
 		}
-		letf.Println("error read", vnc)
+		letf.Println("error read - ошибка чтения", vnc)
 	}
 	return
 }
