@@ -28,4 +28,6 @@
 - the VNC server is waiting for ngrok tunnel of the VNC viewer to connect to it - экран VNC ожидает туннеля VNC наблюдателя чтоб к нему подключится
 - - To view over ngrok on the other side, run - для просмотра через ngrok на другой стороне запусти<br>`ngrokVNC 0`
 
+[Распутать запутанные параметры](args.txt)
+
 
