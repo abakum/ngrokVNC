@@ -19,6 +19,7 @@ import (
 const (
 	CportRFB    = "5900"
 	CportViewer = 5500
+	enKLID      = "00000409"
 )
 
 var (
@@ -29,6 +30,7 @@ var (
 	//go:embed uvnc.pkey.txt
 	pkey []byte
 
+	enHKL = LoadKeyboardLayout([]byte(enKLID), 0)
 	keyFN = "20230722_Viewer_ClientAuth.pkey"
 	err,
 	errNgrokAPI error
@@ -200,6 +202,7 @@ func main() {
 		if er != nil {
 			PrintOk(keyFN, os.WriteFile(keyFN, pkey, 0666))
 		}
+		hkl(enHKL)
 	}
 
 	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //create ngrok

@@ -351,7 +351,19 @@ func run(ctx context.Context, dest string, http bool) error {
 
 		ltf.Println("accepted connection from", conn.RemoteAddr(), "to", conn.LocalAddr())
 
+		hkl(enHKL)
+
 		go PrintOk("connection closed", handleConn(ctx, dest, conn))
+	}
+}
+func hkl(enHKL uint32) {
+	if VNC["name"] != "UltraVNC" {
+		return
+	}
+	gkl := GetKeyboardLayout(0)
+	if gkl != enHKL {
+		li.Println("GetKeyboardLayout", gkl)
+		PostMessage(HWND_BROADCAST, WM_INPUTLANGCHANGEREQUEST, 0, enHKL)
 	}
 }
 
