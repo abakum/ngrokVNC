@@ -1,6 +1,6 @@
 .vscode
-*.exe
-*.bat
-*.json
-*.txt
-!/winres/
+/*.exe
+/*.bat
+/*.json
+/*.txt
+
