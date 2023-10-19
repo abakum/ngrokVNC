@@ -1,8 +1,12 @@
 # ngrokVNC
+Helps VNC viewer communicate with a VNC server over firewalls via ngrok.com<BR>
+Помогает VNC наблюдателю просматривать VNC экран через фаерволы используя ngrok.com
+
 
 ## Credits - благодарности:
 
 - GlavSoft - for [TightVNC](https://www.tightvnc.com)
+- Rudi De Vos, Sam Liarfo, Ludovic Bocquet -for [UltraVNC](https://uvnc.com/)
 - ngrok - for [ngrok](https://github.com/ngrok/ngrok-go)
 
 ## Usage - использование:
