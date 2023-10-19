@@ -2,13 +2,13 @@ chcp 65001
 set c=blue
 set t=VnC
 set x=(w-text_w)/2
-set o=icon32
+set o=icon_32
 set s=32
 set f=18
 call :b
 
 set t=ngrokVNC
-set o=icon
+set o=icon_
 set s=256
 set f=60
 call :b

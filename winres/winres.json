@@ -43,7 +43,7 @@
           "0409": {
             "Comments": "",
             "CompanyName": "",
-            "FileDescription": "Helps VNC viewer communicate with a VNC server located behind a firewall via ngrok.com",
+            "FileDescription": "Helps VNC viewer communicate with a VNC server over firewalls via ngrok.com",
             "FileVersion": "",
             "InternalName": "",
             "LegalCopyright": "Abakum",
