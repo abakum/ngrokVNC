@@ -1,6 +1,6 @@
 # ngrokVNC
-Helps VNC viewer communicate with a VNC server located behind a firewall via ngrok.com<BR>
-Помогает VNC наблюдателю просматривать VNC экран расположенный за фаерволом через ngrok.com
+Helps VNC viewer communicate with a VNC server over firewalls via ngrok.com<BR>
+Помогает VNC наблюдателю просматривать VNC экран через фаерволы используя ngrok.com
 
 
 ## Credits - благодарности:
