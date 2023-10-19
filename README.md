@@ -3,6 +3,7 @@
 ## Credits - благодарности:
 
 - GlavSoft - for [TightVNC](https://www.tightvnc.com)
+- Rudi De Vos, Sam Liarfo, Ludovic Bocquet -for [UltraVNC](https://uvnc.com/)
 - ngrok - for [ngrok](https://github.com/ngrok/ngrok-go)
 
 ## Usage - использование:
