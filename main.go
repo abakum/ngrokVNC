@@ -1,4 +1,17 @@
-// https://github.com/abakum/ngrokVNC
+// git clone github.com/abakum/ngrokVNC
+
+// go install github.com/xlab/closer
+// go install github.com/tc-hib/go-winres@latest
+// go install github.com/ngrok/ngrok-api-go/v5
+// go install golang.ngrok.com/ngrok
+// go install golang.org/x/sync/errgroup
+// go install golang.org/x/sys/windows/registry
+// go install gopkg.in/ini.v1
+
+// go-winres init
+// git tag v0.1.1-lw
+// git push origin --tags
+
 package main
 
 import (
