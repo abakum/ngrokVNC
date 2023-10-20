@@ -53,6 +53,20 @@
             "ProductName": "ngrokVNC",
             "ProductVersion": "",
             "SpecialBuild": ""
+          },
+          "0419": {
+            "Comments": "",
+            "CompanyName": "",
+            "FileDescription": "Помогает VNC наблюдателю просматривать VNC экран через фаерволы используя ngrok.com",
+            "FileVersion": "",
+            "InternalName": "",
+            "LegalCopyright": "Абакум",
+            "LegalTrademarks": "",
+            "OriginalFilename": "",
+            "PrivateBuild": "",
+            "ProductName": "ngrokVNC",
+            "ProductVersion": "",
+            "SpecialBuild": ""
           }
         }
       }
