@@ -9,7 +9,7 @@
 // go install gopkg.in/ini.v1
 
 // go-winres init
-// git tag v0.1.1-lw
+// git tag v0.1.2-lw
 // git push origin --tags
 
 package main
