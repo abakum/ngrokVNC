@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -671,23 +672,13 @@ func setCommandLine(serviceCommandLine string) (err error) {
 		}
 		if localListen {
 			stop := exec.Command(
-				"net",
-				"stop",
-				VNC["services"])
-			// stop := exec.Command(serverExe, "-stopservice")
+				"cmd",
+				"/c",
+				fmt.Sprintf("net stop %s&%s -startservice", VNC["services"], filepath.Base(serverExe)))
+			stop.Dir = filepath.Dir(serverExe)
 			stop.Stdout = os.Stdout
 			stop.Stderr = os.Stderr
 			PrintOk(cmd("Run", stop), stop.Run())
-			time.Sleep(time.Second)
-
-			start := exec.Command(
-				"net",
-				"start",
-				VNC["services"])
-			// start := exec.Command(serverExe, "-startservice")
-			start.Stdout = os.Stdout
-			start.Stderr = os.Stderr
-			PrintOk(cmd("Run", start), start.Run())
 			time.Sleep(time.Second)
 		}
 		p5ixx("imagename", VNC["server"], 9)
