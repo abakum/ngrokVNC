@@ -41,8 +41,7 @@ var (
 	modUser32 = windows.NewLazySystemDLL("User32.dll")
 
 	procGetKeyboardLayout   = modUser32.NewProc("GetKeyboardLayout")
-	procLoadKeyboardLayoutA = modUser32.NewProc("LoadKeyboardLayoutA")
-	procPostMessageA        = modUser32.NewProc("PostMessageA")
+	procLoadKeyboardLayoutW = modUser32.NewProc("LoadKeyboardLayoutW")
 )
 
 func GetKeyboardLayout(idThread uint32) (gkl uint32) {
@@ -51,20 +50,8 @@ func GetKeyboardLayout(idThread uint32) (gkl uint32) {
 	return
 }
 
-func LoadKeyboardLayout(pwszKLID []byte, Flags uint32) (gkl uint32) {
-	var _p0 *byte
-	if len(pwszKLID) > 0 {
-		_p0 = &pwszKLID[0]
-	}
-	r0, _, _ := syscall.Syscall(procLoadKeyboardLayoutA.Addr(), 3, uintptr(unsafe.Pointer(_p0)), uintptr(len(pwszKLID)), uintptr(Flags))
+func LoadKeyboardLayout(pwszKLID *uint16, Flags uint32) (gkl uint32) {
+	r0, _, _ := syscall.Syscall(procLoadKeyboardLayoutW.Addr(), 2, uintptr(unsafe.Pointer(pwszKLID)), uintptr(Flags), 0)
 	gkl = uint32(r0)
-	return
-}
-
-func PostMessage(hWnd uint32, Msg uint32, wParam uint32, lParam uint32) (err error) {
-	r1, _, e1 := syscall.Syscall6(procPostMessageA.Addr(), 4, uintptr(hWnd), uintptr(Msg), uintptr(wParam), uintptr(lParam), 0, 0)
-	if r1 == 0 {
-		err = errnoErr(e1)
-	}
 	return
 }

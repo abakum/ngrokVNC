@@ -115,6 +115,8 @@ func viewer(args ...string) {
 			PrintOk(cmd("Kill", viewer), viewer.Process.Kill())
 		}
 	})
+	processName = VNC["viewer"]
+	go watch(true)
 	li.Println(cmd("Run", viewer))
 	err = viewer.Run()
 }

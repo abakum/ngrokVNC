@@ -50,12 +50,13 @@ func viewerl(args ...string) {
 	}
 	OportViewer := portViewer
 	portViewer = 0
-	p5ixx("imagename", VNC["viewer"], 5)
+	processName = VNC["viewer"]
+	p5ixx(5)
 	if portViewer > 0 {
-		letf.Println(VNC["viewer"], "alredy listen on - уже слушает", portViewer)
+		letf.Println(processName, "alredy listen on - уже слушает", portViewer)
 		localListen = portViewer == OportViewer
 		if !localListen {
-			killViewer := exec.Command("taskKill", "/f", "/im", VNC["viewer"])
+			killViewer := exec.Command("taskKill", "/f", "/im", processName)
 			killViewer.Stdout = os.Stdout
 			killViewer.Stderr = os.Stderr
 			PrintOk(cmd("Run", killViewer), killViewer.Run())
@@ -114,12 +115,12 @@ func viewerl(args ...string) {
 	}
 	port = ":" + port
 	if NGROK_AUTHTOKEN == "" {
-		planB(Errorf("empty NGROK_AUTHTOKEN"), port)
+		planB(Errorf("empty NGROK_AUTHTOKEN"))
 		return
 	}
 
 	if errNgrokAPI == nil {
-		planB(Errorf("found online client: %s", forwardsTo), port)
+		planB(Errorf("found online client: %s", forwardsTo))
 		return
 	}
 
@@ -128,7 +129,7 @@ func viewerl(args ...string) {
 	if err != nil {
 		if strings.Contains(err.Error(), "ERR_NGROK_105") ||
 			strings.Contains(err.Error(), "failed to dial ngrok server") {
-			planB(err, port)
+			planB(err)
 			err = nil
 		}
 	}

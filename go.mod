@@ -20,6 +20,8 @@ require (
 )
 
 require (
+	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
+	github.com/lxn/win v0.0.0-20210218163916-a377121e959e
 	github.com/xlab/closer v1.1.0
 	golang.ngrok.com/ngrok v1.3.0
 	golang.org/x/sync v0.3.0

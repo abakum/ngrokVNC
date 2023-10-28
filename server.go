@@ -14,10 +14,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cakturk/go-netstat/netstat"
+	"github.com/lxn/win"
 	"github.com/xlab/closer"
 	"golang.ngrok.com/ngrok"
 	"golang.ngrok.com/ngrok/config"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"gopkg.in/ini.v1"
 )
@@ -64,7 +67,7 @@ func server(args ...string) {
 						"-reload",
 					)
 					PrintOk(cmd("Run", reload), reload.Run())
-					p5ixx("imagename", VNC["server"], 9)
+					p5ixx(9)
 				}
 			}
 		} else {
@@ -173,7 +176,7 @@ func server(args ...string) {
 		li.Println("\ton TCP port", portRFB)
 		li.Println("\tTo view via the LAN on the other side, run - для просмотра через LAN на другой стороне запусти")
 		li.Printf("\t`ngrokVNC %s [password]`", hpd(ip, portRFB, CportRFB))
-		planB(Errorf("empty NGROK_AUTHTOKEN"), ":"+portRFB)
+		planB(Errorf("empty NGROK_AUTHTOKEN"))
 		return
 	}
 
@@ -234,7 +237,7 @@ func server(args ...string) {
 		li.Printf("\t`ngrokVNC %s [password]`", hpd(ip, portRFB, CportRFB))
 	}
 	if plus {
-		planB(fmt.Errorf("listen %s", portRFB), ":"+portRFB)
+		planB(fmt.Errorf("listen %s", portRFB))
 		err = nil
 	}
 	if AcceptRfbConnections {
@@ -244,7 +247,7 @@ func server(args ...string) {
 	if err != nil {
 		if strings.Contains(err.Error(), "ERR_NGROK_105") ||
 			strings.Contains(err.Error(), "failed to dial ngrok server") {
-			planB(err, ":"+portRFB)
+			planB(err)
 			err = nil
 		}
 	}
@@ -268,7 +271,7 @@ func interfaces() (ifs []string) {
 	}
 	return
 }
-func planB(err error, dest string) {
+func planB(err error) {
 	if !AcceptRfbConnections {
 		letf.Println("no accept connections - подключения запрещены")
 		return
@@ -276,15 +279,49 @@ func planB(err error, dest string) {
 	let.Println(err)
 	li.Println("LAN mode - режим локальной сети")
 	li.Println(ifs)
-	watch(dest)
+	watch(false)
 }
 
-func watch(dest string) {
+// break or closer.Close() on `Stopped TCP`,
+// change input language on `Disconnect TCP` or `Changed TCP`
+func watch(close bool) {
+	old := -1
+	ste_ := ""
 	for {
-		time.Sleep(TO)
-		if netstat("-a", dest, "") == "" {
-			li.Println("no listen ", dest)
+		time.Sleep(TOS)
+		ste := ""
+		new := netSt(func(s *netstat.SockTabEntry) bool {
+			ok := s.Process != nil && s.Process.Name == processName && (s.State == netstat.Listen || s.State == netstat.Established)
+			if ok {
+				ste += fmt.Sprintln("\t", s.LocalAddr, s.RemoteAddr, s.State)
+			}
+			return ok
+		})
+		if new == 0 {
+			lt.Println("Stopped TCP")
+			if close {
+				closer.Close()
+			}
 			break
+		}
+		if old != new {
+			if old > new {
+				lt.Print("Disconnect TCP\n", ste)
+				hkl()
+			} else {
+				if strings.Contains(ste, "ESTABLISHED") {
+					lt.Print("Established TCP\n", ste)
+				} else {
+					lt.Print("Listening TCP\n", ste)
+				}
+			}
+			ste_ = ste
+			old = new
+		}
+		if ste_ != ste {
+			lt.Print("Changed TCP\n", ste)
+			hkl()
+			ste_ = ste
 		}
 	}
 }
@@ -336,15 +373,9 @@ func run(ctx context.Context, dest string, http bool) error {
 	}
 
 	ltf.Println("tunnel created:", tun.URL())
-	go func() {
-		watch(dest)
-		closer.Close()
-	}()
+	go watch(true)
 
 	for {
-		if netstat("-a", dest, "") == "" {
-			return srcError(fmt.Errorf("no listen %s", dest))
-		}
 		conn, err := tun.Accept()
 		if err != nil {
 			return srcError(err)
@@ -352,20 +383,68 @@ func run(ctx context.Context, dest string, http bool) error {
 
 		ltf.Println("accepted connection from", conn.RemoteAddr(), "to", conn.LocalAddr())
 
-		hkl(enHKL)
-
 		go PrintOk("connection closed", handleConn(ctx, dest, conn))
 	}
 }
-func hkl(enHKL uint32) {
+
+func hkl() {
+	const (
+		Tray   = "Shell_TrayWnd"
+		usKLID = "00000409"
+	)
 	if VNC["name"] != "UltraVNC" {
 		return
 	}
-	gkl := GetKeyboardLayout(0)
-	if gkl != enHKL {
-		li.Println("GetKeyboardLayout", gkl)
-		PostMessage(HWND_BROADCAST, WM_INPUTLANGCHANGEREQUEST, 0, enHKL)
+	pwszKLID, err := windows.UTF16PtrFromString(usKLID)
+	if err != nil {
+		return
 	}
+	usHKL := LoadKeyboardLayout(pwszKLID, 0)
+
+	hwnd := win.GetForegroundWindow()
+	for {
+		if hwnd == 0 {
+			return
+		}
+		kl, class := gkl(hwnd)
+		if kl == usHKL {
+			return
+		}
+		ltf.Println("gkl", kl, class, hwnd)
+		win.PostMessage(hwnd, win.WM_INPUTLANGCHANGEREQUEST, 0, uintptr(usHKL))
+		hwnd = win.GetWindow(hwnd, win.GW_HWNDPREV)
+		if class == Tray {
+			win.SetForegroundWindow(hwnd)
+		}
+		time.Sleep(time.Millisecond * 7)
+	}
+}
+
+func GetClassName(hwnd win.HWND) string {
+	className, _ := windows.UTF16PtrFromString("")
+	copied, err := win.GetClassName(hwnd, className, win.MAX_PATH)
+	if copied == 0 || err != nil {
+		return ""
+	}
+	return windows.UTF16PtrToString(className)
+}
+
+func gkl(hwnd win.HWND) (kl uint32, class string) {
+	const Console = "ConsoleWindowClass"
+	if hwnd == 0 {
+		return
+	}
+	class = GetClassName(hwnd)
+	if class == Console {
+		hwnd = win.GetWindow(hwnd, win.GW_HWNDPREV)
+		if hwnd == 0 {
+			return
+		}
+	}
+	// tid, _ := windows.GetWindowThreadProcessId(windows.HWND(hwnd), nil)
+	tid := win.GetWindowThreadProcessId(hwnd, nil)
+	kl = GetKeyboardLayout(tid)
+	return
 }
 
 func handleConn(ctx context.Context, dest string, conn net.Conn) error {
@@ -430,98 +509,58 @@ func SetDWordValue(k registry.Key, key string, val int) {
 		PrintOk(key, k.SetDWordValue(key, uint32(val)))
 	}
 }
-func ns(a string) string {
-	var (
-		err     error
-		bBuffer bytes.Buffer
-	)
-	opts := []string{
-		"-n",
-		"-p",
-		"TCP",
-		"-o",
-	}
-	if a != "" {
-		opts = append(opts, a)
-	}
-	stat := exec.Command("netstat", opts...)
-	stat.Stdout = &bBuffer
-	stat.Stderr = &bBuffer
-	err = stat.Run()
+
+// `netstat -n -p TCP -o -a` | find "LISTEN"
+func ns(a string) (stat string) {
+	tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
+		return s.State == netstat.Listen
+	})
 	if err != nil {
-		PrintOk(cmd("Run", stat), err)
 		return ""
 	}
-	return bBuffer.String()
-}
-
-func nStat(all, a, host, pid string) (contains string) {
-	var (
-		err     error
-		bBuffer bytes.Buffer
-	)
-	ok := "LISTENING"
-	if a == "" {
-		ok = "ESTABLISHED"
+	for _, e := range tabs {
+		stat += fmt.Sprintln("  TCP   ", e.LocalAddr.String(), e.RemoteAddr.String(), "LISTENING", e.Process.Pid)
 	}
-	bBuffer.WriteString(all)
-	for {
-		contains, err = bBuffer.ReadString('\n')
-		if err != nil {
-			return ""
-		}
-		if strings.Contains(contains, host) && strings.Contains(contains, ok) && strings.Contains(contains, pid) {
-			return
-		}
+	return
+}
+
+// func(s *netstat.SockTabEntry) bool {return s.State == a}
+func netSt(accept netstat.AcceptFn) int {
+	tabs, err := netstat.TCPSocks(accept)
+	if err != nil {
+		return 0
 	}
+	return len(tabs)
 }
 
-func netstat(a, host, pid string) (contains string) {
-	return nStat(ns(a), a, host, pid)
-}
-
-func p5ixx(key, val string, i int) {
-	if val == "" {
+func p5ixx(i int) {
+	min := uint16((50 + i) * 100)
+	max := uint16((50 + i + 1) * 100)
+	tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
+		return s.State == netstat.Listen && s.LocalAddr.Port >= min && s.LocalAddr.Port < max && s.Process != nil && s.Process.Name == processName
+	})
+	if err != nil {
 		return
 	}
-	s50 := strconv.Itoa(50 + i)
-	bBuffer := tl(key + " eq " + val)
-	all := ns("-a")
-	for {
-		line, err := bBuffer.ReadString('\n')
-		if err != nil {
-			return
-		}
-		parts := strings.Split(line, ".exe")
-		if len(parts) < 2 {
-			continue
-		}
-		pid := strings.Split(strings.TrimSpace(parts[1]), " ")[0]
-		pref := "  TCP    0.0.0.0:" + s50
-		suffix := strings.Split(strings.TrimPrefix(nStat(all, "-a", pref, pid), pref), " ")[0]
-		if suffix == "" {
-			continue
-		}
-		x, err := strconv.Atoi(s50 + suffix)
-		if err != nil || x > (50+i+1)*100-1 || x < (50+i)*100 {
-			continue
-		}
-		ltf.Println(key, val, x)
+	for _, s := range tabs {
+		x := int(s.LocalAddr.Port)
+		ltf.Println(processName, x)
 		if i == 9 {
-			proxy = val == "repeater_service"
+			proxy = processName == repeater_service
 			if proxy {
 				PportRFB = strconv.Itoa(x)
 			} else {
 				portRFB = strconv.Itoa(x)
 			}
 		} else {
-			proxy2 = val == "repeater_service"
+			proxy2 = processName == repeater_service
 			if proxy2 {
 				PportViewer = x
 			} else {
 				portViewer = x
 			}
 		}
+		break
 	}
 }
 
@@ -681,7 +720,7 @@ func setCommandLine(serviceCommandLine string) (err error) {
 			PrintOk(cmd("Run", stop), stop.Run())
 			time.Sleep(time.Second)
 		}
-		p5ixx("imagename", VNC["server"], 9)
+		p5ixx(9)
 	}
 	return
 }

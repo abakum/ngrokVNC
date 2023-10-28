@@ -2,8 +2,6 @@ package main
 
 import (
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/xlab/closer"
 )
@@ -26,7 +24,6 @@ func serverLAN(args ...string) {
 		}
 	}
 	tcp, port, diff = hp(tcp, strconv.Itoa(portViewer))
-	host := strings.Replace(tcp, "::", ":", 1)
 	li.Println("host", tcp)
 
 	li.Println("On the other side was launched - на другой стороне был запушен")
@@ -43,13 +40,5 @@ func serverLAN(args ...string) {
 		err = srcError(err)
 		return
 	}
-	ESTABLISHED := netstat("", host, "")
-	for {
-		new = netstat("", host, "")
-		if new == "" || new != ESTABLISHED {
-			li.Println("VNC viewer connected - VNC наблюдатель подключен? no")
-			break
-		}
-		time.Sleep(TO)
-	}
+	watch(false)
 }

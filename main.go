@@ -1,15 +1,18 @@
 // git clone github.com/abakum/ngrokVNC
 
-// go install github.com/xlab/closer
+// go get github.com/xlab/closer
+// go get github.com/ngrok/ngrok-api-go/v5
+// go get golang.ngrok.com/ngrok
+// go get golang.org/x/sync/errgroup
+// go get golang.org/x/sys/windows/registry
+// go get gopkg.in/ini.v1
+// go get github.com/lxn/win
+// go get github.com/cakturk/go-netstat
+// go get github.com/cakturk/go-netstat/netstat
 // go install github.com/tc-hib/go-winres@latest
-// go install github.com/ngrok/ngrok-api-go/v5
-// go install golang.ngrok.com/ngrok
-// go install golang.org/x/sync/errgroup
-// go install golang.org/x/sys/windows/registry
-// go install gopkg.in/ini.v1
 
 // go-winres init
-// git tag v0.1.2-lw
+// git tag v0.2.1-lw
 // git push origin --tags
 
 package main
@@ -33,7 +36,6 @@ import (
 const (
 	CportRFB    = "5900"
 	CportViewer = 5500
-	enKLID      = "00000409"
 )
 
 var (
@@ -44,19 +46,20 @@ var (
 	//go:embed uvnc.pkey.txt
 	pkey []byte
 
-	enHKL = LoadKeyboardLayout([]byte(enKLID), 0)
 	keyFN = "20230722_Viewer_ClientAuth.pkey"
 	err,
 	errNgrokAPI error
-	TO          = time.Second * 60
-	portRFB     = CportRFB
-	portViewer  = CportViewer
-	RportRFB    = ""
-	RportViewer = 0
-	PportRFB    = CportRFB
-	PportViewer = CportViewer
-	VNC         = map[string]string{"name": ""}
-	TightVNC    = map[string]string{
+	TO               = time.Second * 60
+	TOS              = time.Second * 7
+	portRFB          = CportRFB
+	portViewer       = CportViewer
+	RportRFB         = ""
+	RportViewer      = 0
+	PportRFB         = CportRFB
+	PportViewer      = CportViewer
+	repeater_service = "repeater.exe"
+	VNC              = map[string]string{"name": ""}
+	TightVNC         = map[string]string{
 		"name":     "TightVNC",
 		"server":   "tvnserver.exe",
 		"viewer":   "tvnviewer.exe",
@@ -91,6 +94,7 @@ var (
 	VNCs = []map[string]string{TightVNC, UltraVNC, TurboVNC, RealVNC}
 	serverExe,
 	viewerExe,
+	processName,
 	control,
 	connect,
 	publicURL,
@@ -196,9 +200,10 @@ func main() {
 	}
 
 	li.Println(VNC["name"], VNC["path"])
-	serverExe = filepath.Join(VNC["path"], VNC["server"])
+	processName = VNC["server"]
+	serverExe = filepath.Join(VNC["path"], processName)
 	viewerExe = filepath.Join(VNC["path"], VNC["viewer"])
-	servers = strings.Count(taskList("imagename eq "+VNC["server"]), VNC["server"])
+	servers = strings.Count(taskList("imagename eq "+processName), processName)
 	if VNC["name"] == "UltraVNC" {
 		ultravnc = filepath.Join(VNC["path"], "ultravnc.ini")
 		iniFile, err = ini.Load(ultravnc)
@@ -216,7 +221,7 @@ func main() {
 		if er != nil {
 			PrintOk(keyFN, os.WriteFile(keyFN, pkey, 0666))
 		}
-		hkl(enHKL)
+		hkl()
 	}
 
 	NGROK_AUTHTOKEN = Getenv("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN) //create ngrok
@@ -229,11 +234,14 @@ func main() {
 		args[k] = strings.ReplaceAll(v, ";", ":")
 	}
 
-	p5ixx("imagename", VNC["server"], 9)
-	p5ixx("services", "repeater_service", 9)
+	p5ixx(9)
+	processName = repeater_service
+	p5ixx(9)
 	if proxy {
-		p5ixx("services", "repeater_service", 5)
+		p5ixx(5)
 	}
+	processName = VNC["server"]
+
 	publicURL, forwardsTo, errNgrokAPI = ngrokAPI(NGROK_API_KEY)
 	if (strings.HasPrefix(forwardsTo, ifs) || errNgrokAPI != nil) && vh(args) {
 		err = srcError(fmt.Errorf("loop detected - обнаружена петля"))
