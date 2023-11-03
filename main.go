@@ -11,9 +11,10 @@
 // go get github.com/cakturk/go-netstat/netstat
 // go install github.com/tc-hib/go-winres@latest
 // go get github.com/mitchellh/go-ps
+// go get github.com/zzl/go-win32api/v2
 
 // go-winres init
-// git tag v0.2.2-lw
+// git tag v0.3.1-lw
 // git push origin --tags
 
 package main

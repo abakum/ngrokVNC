@@ -12,15 +12,17 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/cakturk/go-netstat/netstat"
-	"github.com/lxn/win"
 	"github.com/mitchellh/go-ps"
 	"github.com/xlab/closer"
+	"github.com/zzl/go-win32api/v2/win32"
+
+	// "github.com/zzl/go-win32api/v2/win32"
 	"golang.ngrok.com/ngrok"
 	"golang.ngrok.com/ngrok/config"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"gopkg.in/ini.v1"
 )
@@ -395,55 +397,72 @@ func hkl() {
 	if VNC["name"] != "UltraVNC" {
 		return
 	}
-	pwszKLID, err := windows.UTF16PtrFromString(usKLID)
-	if err != nil {
+	usHKL, er := win32.LoadKeyboardLayout(win32.StrToPwstr(usKLID), 0)
+	if er != win32.NO_ERROR {
+		letf.Println(er)
 		return
 	}
-	usHKL := LoadKeyboardLayout(pwszKLID, 0)
+	ltf.Println("LoadKeyboardLayout", usHKL)
+	hwnd := win32.GetForegroundWindow()
 
-	hwnd := win.GetForegroundWindow()
 	for {
 		if hwnd == 0 {
 			return
 		}
 		kl, class := gkl(hwnd)
+		ltf.Println("gkl", kl, class, hwnd)
 		if kl == usHKL {
 			return
 		}
-		ltf.Println("gkl", kl, class, hwnd)
-		win.PostMessage(hwnd, win.WM_INPUTLANGCHANGEREQUEST, 0, uintptr(usHKL))
-		hwnd = win.GetWindow(hwnd, win.GW_HWNDPREV)
-		if class == Tray {
-			win.SetForegroundWindow(hwnd)
+		win32.PostMessage(hwnd, win32.WM_INPUTLANGCHANGEREQUEST, 0, uintptr(usHKL))
+		hwnd, er = win32.GetWindow(hwnd, win32.GW_HWNDPREV)
+		if er != win32.NO_ERROR {
+			letf.Println(er)
+		}
+		if hwnd != 0 && er == win32.NO_ERROR && class == Tray {
+			win32.SetForegroundWindow(hwnd)
 		}
 		time.Sleep(time.Millisecond * 7)
 	}
 }
 
-func GetClassName(hwnd win.HWND) string {
-	className, _ := windows.UTF16PtrFromString("")
-	copied, err := win.GetClassName(hwnd, className, win.MAX_PATH)
-	if copied == 0 || err != nil {
-		return ""
+func GetClassName(hwnd win32.HWND) (ClassName string) {
+	if hwnd == 0 {
+		return
 	}
-	return windows.UTF16PtrToString(className)
+	lpClassName := win32.StrToPwstr("")
+	copied, er := win32.GetClassName(hwnd, lpClassName, int32(win32.MAX_PATH))
+	if er != win32.NO_ERROR {
+		letf.Println(er)
+		return
+	}
+	if copied == 0 {
+		return
+	}
+	ClassName = win32.PwstrToStr(lpClassName)
+	return
 }
 
-func gkl(hwnd win.HWND) (kl uint32, class string) {
+// func gkl(hwnd win.HWND) (kl uint32, class string) {
+func gkl(hwnd win32.HWND) (kl unsafe.Pointer, class string) {
 	const Console = "ConsoleWindowClass"
+	var er win32.WIN32_ERROR
 	if hwnd == 0 {
 		return
 	}
 	class = GetClassName(hwnd)
 	if class == Console {
-		hwnd = win.GetWindow(hwnd, win.GW_HWNDPREV)
+		hwnd, er = win32.GetWindow(hwnd, win32.GW_HWNDPREV)
+		if er != win32.NO_ERROR {
+			letf.Println(er)
+			return
+		}
 		if hwnd == 0 {
 			return
 		}
 	}
-	// tid, _ := windows.GetWindowThreadProcessId(windows.HWND(hwnd), nil)
-	tid := win.GetWindowThreadProcessId(hwnd, nil)
-	kl = GetKeyboardLayout(tid)
+	tid := win32.GetWindowThreadProcessId(hwnd, nil)
+	kl = win32.GetKeyboardLayout(tid)
 	return
 }
 
@@ -512,20 +531,6 @@ func SetDWordValue(k registry.Key, key string, val int) {
 	}
 }
 
-// `netstat -n -p TCP -o -a` | find "LISTEN"
-func ns(a string) (stat string) {
-	tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
-		return s.State == netstat.Listen
-	})
-	if err != nil {
-		return ""
-	}
-	for _, e := range tabs {
-		stat += fmt.Sprintln("  TCP   ", e.LocalAddr.String(), e.RemoteAddr.String(), "LISTENING", e.Process.Pid)
-	}
-	return
-}
-
 // func(s *netstat.SockTabEntry) bool {return s.State == a}
 func netSt(accept netstat.AcceptFn) int {
 	tabs, err := netstat.TCPSocks(accept)
@@ -537,7 +542,7 @@ func netSt(accept netstat.AcceptFn) int {
 
 func p5ixx(i int) {
 	min := uint16((50 + i) * 100)
-	max := uint16((50 + i + 1) * 100)
+	max := min + 100
 	tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
 		return s.State == netstat.Listen && s.LocalAddr.Port >= min && s.LocalAddr.Port < max && s.Process != nil && s.Process.Name == processName
 	})
@@ -562,7 +567,9 @@ func p5ixx(i int) {
 				portViewer = x
 			}
 		}
-		break
+		if true {
+			return
+		}
 	}
 }
 
