@@ -415,28 +415,35 @@ func hkl() {
 			return
 		}
 		win32.PostMessage(hwnd, win32.WM_INPUTLANGCHANGEREQUEST, 0, uintptr(usHKL))
+		time.Sleep(time.Millisecond * 7)
 		hwnd, er = win32.GetWindow(hwnd, win32.GW_HWNDPREV)
-		if er != win32.NO_ERROR {
-			letf.Println(er)
+		if hwnd == 0 || er != win32.NO_ERROR {
+			letf.Println(hwnd, er)
+			continue
 		}
-		if hwnd != 0 && er == win32.NO_ERROR && class == Tray {
+		if class == Tray {
 			win32.SetForegroundWindow(hwnd)
 		}
-		time.Sleep(time.Millisecond * 7)
 	}
 }
 
+func BufToPwstr(size uint) *uint16 {
+	buf := make([]uint16, size*2+1)
+	return &buf[0]
+}
+
 func GetClassName(hwnd win32.HWND) (ClassName string) {
+	const nMaxCount = 256
+
 	if hwnd == 0 {
 		return
 	}
-	lpClassName := win32.StrToPwstr("")
-	copied, er := win32.GetClassName(hwnd, lpClassName, int32(win32.MAX_PATH))
-	if er != win32.NO_ERROR {
-		letf.Println(er)
-		return
-	}
-	if copied == 0 {
+
+	// lpClassName := win32.StrToPwstr("")
+	// lpClassName := win32.StrToPwstr(strings.Repeat(" ", nMaxCount))
+	lpClassName := BufToPwstr(nMaxCount)
+	copied, er := win32.GetClassName(hwnd, lpClassName, nMaxCount)
+	if copied == 0 || er != win32.NO_ERROR {
 		return
 	}
 	ClassName = win32.PwstrToStr(lpClassName)
