@@ -10,9 +10,10 @@
 // go get github.com/cakturk/go-netstat
 // go get github.com/cakturk/go-netstat/netstat
 // go install github.com/tc-hib/go-winres@latest
+// go get github.com/mitchellh/go-ps
 
 // go-winres init
-// git tag v0.2.1-lw
+// git tag v0.2.2-lw
 // git push origin --tags
 
 package main
@@ -36,6 +37,7 @@ import (
 const (
 	CportRFB    = "5900"
 	CportViewer = 5500
+	services    = "services.exe"
 )
 
 var (
@@ -49,17 +51,17 @@ var (
 	keyFN = "20230722_Viewer_ClientAuth.pkey"
 	err,
 	errNgrokAPI error
-	TO               = time.Second * 60
-	TOS              = time.Second * 7
-	portRFB          = CportRFB
-	portViewer       = CportViewer
-	RportRFB         = ""
-	RportViewer      = 0
-	PportRFB         = CportRFB
-	PportViewer      = CportViewer
-	repeater_service = "repeater.exe"
-	VNC              = map[string]string{"name": ""}
-	TightVNC         = map[string]string{
+	TO          = time.Second * 60
+	TOS         = time.Second * 7
+	portRFB     = CportRFB
+	portViewer  = CportViewer
+	RportRFB    = ""
+	RportViewer = 0
+	PportRFB    = CportRFB
+	PportViewer = CportViewer
+	repeater    = "repeater.exe"
+	VNC         = map[string]string{"name": ""}
+	TightVNC    = map[string]string{
 		"name":     "TightVNC",
 		"server":   "tvnserver.exe",
 		"viewer":   "tvnviewer.exe",
@@ -147,7 +149,7 @@ func main() {
 		return
 	}
 	imagename := filepath.Base(executable)
-	first = strings.Count(taskList("imagename eq "+imagename), imagename) == 1
+	first = psCount(imagename, "") == 1
 
 	ips = interfaces()
 	if len(ips) == 0 {
@@ -203,7 +205,7 @@ func main() {
 	processName = VNC["server"]
 	serverExe = filepath.Join(VNC["path"], processName)
 	viewerExe = filepath.Join(VNC["path"], VNC["viewer"])
-	servers = strings.Count(taskList("imagename eq "+processName), processName)
+	servers = psCount(processName, "")
 	if VNC["name"] == "UltraVNC" {
 		ultravnc = filepath.Join(VNC["path"], "ultravnc.ini")
 		iniFile, err = ini.Load(ultravnc)
@@ -235,7 +237,7 @@ func main() {
 	}
 
 	p5ixx(9)
-	processName = repeater_service
+	processName = repeater
 	p5ixx(9)
 	if proxy {
 		p5ixx(5)

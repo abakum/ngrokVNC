@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/cakturk/go-netstat/netstat"
 	"github.com/lxn/win"
+	"github.com/mitchellh/go-ps"
 	"github.com/xlab/closer"
 	"golang.ngrok.com/ngrok"
 	"golang.ngrok.com/ngrok/config"
@@ -473,24 +473,26 @@ func handleConn(ctx context.Context, dest string, conn net.Conn) error {
 	return g.Wait()
 }
 
-func taskList(fi string) string {
-	bBuffer := tl(fi)
-	return bBuffer.String()
-}
-
-func tl(fi string) (bBuffer bytes.Buffer) {
-	list := exec.Command(
-		"tasklist",
-		"/nh",
-		"/fi",
-		fi,
-	)
-	list.Stdout = &bBuffer
-	list.Stderr = &bBuffer
-	err := list.Run()
+func psCount(name, parent string) (count int) {
+	pes, err := ps.Processes()
 	if err != nil {
-		PrintOk(cmd("Run", list), err)
 		return
+	}
+	for _, p := range pes {
+		if p == nil {
+			continue
+		}
+		ok := true
+		if parent != "" {
+			pp, err := ps.FindProcess(p.PPid())
+			if pp == nil || err != nil {
+				continue
+			}
+			ok = pp.Executable() == parent
+		}
+		if p.Executable() == name && ok {
+			count++
+		}
 	}
 	return
 }
@@ -546,14 +548,14 @@ func p5ixx(i int) {
 		x := int(s.LocalAddr.Port)
 		ltf.Println(processName, x)
 		if i == 9 {
-			proxy = processName == repeater_service
+			proxy = processName == repeater
 			if proxy {
 				PportRFB = strconv.Itoa(x)
 			} else {
 				portRFB = strconv.Itoa(x)
 			}
 		} else {
-			proxy2 = processName == repeater_service
+			proxy2 = processName == repeater
 			if proxy2 {
 				PportViewer = x
 			} else {
@@ -571,7 +573,7 @@ func ll() {
 		if xVNC["server"] == "" {
 			continue
 		}
-		localListen = strings.Contains(taskList("services eq "+xVNC["services"]), xVNC["server"])
+		localListen = psCount(xVNC["server"], services) > 0
 		if localListen {
 			control = "-controlservice"
 			k = registry.LOCAL_MACHINE
