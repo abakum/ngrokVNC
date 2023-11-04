@@ -414,8 +414,15 @@ func hkl() {
 		if kl == usHKL {
 			return
 		}
-		win32.PostMessage(hwnd, win32.WM_INPUTLANGCHANGEREQUEST, 0, uintptr(usHKL))
-		time.Sleep(time.Millisecond * 7)
+		ret, er := win32.SendMessage(hwnd, win32.WM_INPUTLANGCHANGEREQUEST, 0, uintptr(usHKL))
+		if ret != 0 || er != win32.NO_ERROR {
+			ltf.Println("SendMessage", ret, er)
+		}
+		// 	ret, er := win32.PostMessage(hwnd, win32.WM_INPUTLANGCHANGEREQUEST, 0, uintptr(usHKL))
+		// 	if ret != win32.TRUE || er != win32.NO_ERROR {
+		// 		ltf.Println("PostMessage", ret, er)
+		// 	}
+		// 	time.Sleep(time.Millisecond * 7)
 		hwnd, er = win32.GetWindow(hwnd, win32.GW_HWNDPREV)
 		if hwnd == 0 || er != win32.NO_ERROR {
 			letf.Println(hwnd, er)

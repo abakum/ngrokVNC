@@ -14,7 +14,7 @@
 // go get github.com/zzl/go-win32api/v2
 
 // go-winres init
-// git tag v0.3.2-lw
+// git tag v0.3.3-lw
 // git push origin --tags
 
 package main
