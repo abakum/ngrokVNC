@@ -1,22 +1,42 @@
-// git clone github.com/abakum/ngrokVNC
+/*
+git clone github.com/abakum/ngrokVNC
 
-// go get github.com/xlab/closer
-// go get github.com/ngrok/ngrok-api-go/v5
-// go get golang.ngrok.com/ngrok
-// go get golang.org/x/sync/errgroup
-// go get golang.org/x/sys/windows/registry
-// go get gopkg.in/ini.v1
-// go get github.com/lxn/win
-// go get github.com/cakturk/go-netstat
+go get github.com/xlab/closer
+go get github.com/ngrok/ngrok-api-go/v5
+go get golang.org/x/sync/errgroup
+go get golang.org/x/sys/windows/registry
+go get gopkg.in/ini.v1
+go get github.com/lxn/win
 // go get github.com/cakturk/go-netstat/netstat
-// go install github.com/tc-hib/go-winres@latest
-// go get github.com/mitchellh/go-ps
-// go get github.com/zzl/go-win32api/v2
 
-// go-winres init
-// git tag v0.3.3-lw
-// git push origin --tags
+fork github.com/cakturk/go-netstat to github.com/abakum/go-netstat
+cd /d y:\src
+git clone github.com/cakturk/go-netstat
+cd go-netstat
+rm go.mod
+replace all github.com/cakturk/go-netstat/netstat with github.com/abakum/go-netstat
+go mod init github.com/abakum/go-netstat
+go mod tidy
+git commit...
+git push...
+cd ..
+cd ngrokVNC
+go clean -modcache
+go get github.com/abakum/go-netstat/netstat
+replace all github.com/cakturk/go-netstat/netstat in inport
 
+go get golang.ngrok.com/ngrok
+c:\Users\kga\go\pkg\mod\golang.ngrok.com\ngrok@v1.5.1\session.go
+c:\Users\kga\go\pkg\mod\golang.ngrok.com\ngrok@v1.5.1\forward.go
+go install github.com/tc-hib/go-winres@latest
+go get github.com/mitchellh/go-ps
+go get github.com/zzl/go-win32api/v2
+
+go-winres init
+git tag v0.3.3-lw
+git push origin --tags
+go get -u
+*/
 package main
 
 import (
@@ -54,6 +74,7 @@ var (
 	errNgrokAPI error
 	TO          = time.Second * 60
 	TOS         = time.Second * 7
+	TOM         = time.Millisecond * 7
 	portRFB     = CportRFB
 	portViewer  = CportViewer
 	RportRFB    = ""

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/netip"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,7 +15,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/cakturk/go-netstat/netstat"
+	// "github.com/cakturk/go-netstat/netstat"
+	"github.com/abakum/go-netstat/netstat"
 	"github.com/mitchellh/go-ps"
 	"github.com/xlab/closer"
 	"github.com/zzl/go-win32api/v2/win32"
@@ -22,6 +24,7 @@ import (
 	// "github.com/zzl/go-win32api/v2/win32"
 	"golang.ngrok.com/ngrok"
 	"golang.ngrok.com/ngrok/config"
+	ngrok_log "golang.ngrok.com/ngrok/log"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/windows/registry"
 	"gopkg.in/ini.v1"
@@ -243,7 +246,8 @@ func server(args ...string) {
 		err = nil
 	}
 	if AcceptRfbConnections {
-		err = run(context.Background(), ":"+lPortRFB(portRFB), false)
+		// err = run(context.Background(), ":"+lPortRFB(portRFB), false)
+		err = run2(context.Background(), ":"+lPortRFB(portRFB), false)
 	}
 
 	if err != nil {
@@ -355,7 +359,7 @@ func run(ctx context.Context, dest string, http bool) error {
 		ngrok.WithAuthtoken(NGROK_AUTHTOKEN),
 		ngrok.WithStopHandler(func(ctx context.Context, sess ngrok.Session) error {
 			go func() {
-				time.Sleep(time.Millisecond * 10)
+				time.Sleep(TOM)
 				ca()
 			}()
 			return nil
@@ -364,7 +368,7 @@ func run(ctx context.Context, dest string, http bool) error {
 			PrintOk("WithDisconnectHandler", err)
 			if err == nil {
 				go func() {
-					time.Sleep(time.Millisecond * 10)
+					time.Sleep(TOM)
 					ca()
 				}()
 			}
@@ -389,6 +393,64 @@ func run(ctx context.Context, dest string, http bool) error {
 	}
 }
 
+func run2(ctx context.Context, dest string, http bool) error {
+	ctxWT, caWT := context.WithTimeout(ctx, time.Second)
+	defer caWT()
+	sess, err := ngrok.Connect(ctxWT,
+		ngrok.WithAuthtoken(NGROK_AUTHTOKEN),
+	)
+	if err != nil {
+		return Errorf("Connect %w", err)
+	}
+	sess.Close()
+
+	ctx, ca := context.WithCancel(ctx)
+	defer func() {
+		if err != nil {
+			ca()
+		}
+	}()
+	endpoint := config.TCPEndpoint(config.WithForwardsTo(withForwardsTo(dest)))
+	if http {
+		endpoint = config.HTTPEndpoint(config.WithForwardsTo(withForwardsTo(dest)))
+	}
+
+	destURL, err := url.Parse("tcp://" + dest)
+	if err != nil {
+		return Errorf("Parse %w", err)
+	}
+	fwd, err := ngrok.ListenAndForward(ctx,
+		destURL,
+		endpoint,
+		ngrok.WithAuthtoken(NGROK_AUTHTOKEN),
+		ngrok.WithStopHandler(func(ctx context.Context, sess ngrok.Session) error {
+			go func() {
+				time.Sleep(TOM)
+				ca()
+			}()
+			return nil
+		}),
+		ngrok.WithDisconnectHandler(func(ctx context.Context, sess ngrok.Session, err error) {
+			PrintOk("WithDisconnectHandler", err)
+			if err == nil {
+				go func() {
+					time.Sleep(TOM)
+					ca()
+				}()
+			}
+		}),
+		ngrok.WithLogger(&logger{lvl: ngrok_log.LogLevelDebug}),
+	)
+	if err != nil {
+		return srcError(err)
+	}
+
+	ltf.Println("tunnel created:", fwd.URL())
+	go watch(true)
+
+	return srcError(fwd.Wait())
+}
+
 func hkl() {
 	const (
 		Tray   = "Shell_TrayWnd"
@@ -402,7 +464,7 @@ func hkl() {
 		letf.Println(er)
 		return
 	}
-	ltf.Println("LoadKeyboardLayout", usHKL)
+	// ltf.Println("LoadKeyboardLayout", usHKL)
 	hwnd := win32.GetForegroundWindow()
 
 	for {
@@ -410,10 +472,10 @@ func hkl() {
 			return
 		}
 		kl, class := gkl(hwnd)
-		ltf.Println("gkl", kl, class, hwnd)
 		if kl == usHKL {
 			return
 		}
+		ltf.Println("gkl", kl, class, hwnd)
 		ret, er := win32.SendMessage(hwnd, win32.WM_INPUTLANGCHANGEREQUEST, 0, uintptr(usHKL))
 		if ret != 0 || er != win32.NO_ERROR {
 			ltf.Println("SendMessage", ret, er)
@@ -422,7 +484,7 @@ func hkl() {
 		// 	if ret != win32.TRUE || er != win32.NO_ERROR {
 		// 		ltf.Println("PostMessage", ret, er)
 		// 	}
-		// 	time.Sleep(time.Millisecond * 7)
+		// 	time.Sleep(TOM)
 		hwnd, er = win32.GetWindow(hwnd, win32.GW_HWNDPREV)
 		if hwnd == 0 || er != win32.NO_ERROR {
 			letf.Println(hwnd, er)
@@ -493,7 +555,7 @@ func handleConn(ctx context.Context, dest string, conn net.Conn) error {
 	g.Go(func() error {
 		_, err := io.Copy(next, conn)
 		next.(*net.TCPConn).CloseWrite() //for close without error
-		time.Sleep(time.Millisecond * 7)
+		time.Sleep(TOM)
 		next.Close()
 		return srcError(err)
 	})
@@ -758,4 +820,20 @@ func autoreconnect(tcp string) (a string) {
 	}
 	a += "-connect " + tcp
 	return
+}
+
+// Simple logger that forwards to the Go standard logger.
+type logger struct {
+	lvl ngrok_log.LogLevel
+}
+
+func (l *logger) Log(ctx context.Context, lvl ngrok_log.LogLevel, msg string, data map[string]interface{}) {
+	if lvl > l.lvl {
+		return
+	}
+	// lvlName, _ := ngrok_log.StringFromLogLevel(lvl)
+	// log.Printf("[%s] %s %v", lvlName, msg, data)
+	if msg != "heartbeat received" {
+		ltf.Println(msg, data)
+	}
 }
