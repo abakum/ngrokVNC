@@ -33,14 +33,14 @@ go get github.com/mitchellh/go-ps
 go get github.com/zzl/go-win32api/v2
 
 go-winres init
-git tag v0.3.3-lw
+git tag -F VERSION
 git push origin --tags
 go get -u
 */
 package main
 
 import (
-	_ "embed"
+	_ "embed" // nolint
 	"fmt"
 	"net/url"
 	"os"
@@ -68,6 +68,8 @@ var (
 	NGROK_API_KEY string
 	//go:embed uvnc.pkey.txt
 	pkey []byte
+	//go:embed VERSION
+	VERSION string
 
 	keyFN = "20230722_Viewer_ClientAuth.pkey"
 	err,
