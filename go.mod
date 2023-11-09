@@ -6,6 +6,7 @@ require github.com/ngrok/ngrok-api-go/v5 v5.1.0
 
 require (
 	github.com/go-stack/stack v1.8.1 // indirect
+	github.com/inconshreveable/log15 v3.0.0-testing.5+incompatible // indirect
 	github.com/inconshreveable/log15/v3 v3.0.0-testing.5 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -19,7 +20,6 @@ require (
 
 require (
 	github.com/abakum/go-netstat v0.0.0-20231106075911-001f10558dcf
-	github.com/inconshreveable/log15 v3.0.0-testing.5+incompatible
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/xlab/closer v1.1.0
 	github.com/zzl/go-win32api/v2 v2.1.0

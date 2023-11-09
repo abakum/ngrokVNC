@@ -1,7 +1,6 @@
 .vscode
-/*.json
-/*.txt
-/*.lnk
-/*.bat
-/*.exe
-/*.syso
+*.txt
+*.lnk
+*.bat
+*.exe
+*.syso
