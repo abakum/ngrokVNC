@@ -194,28 +194,31 @@ func main() {
 	}
 
 	key := `SOFTWARE\Classes\VncViewer.Config\DefaultIcon`
-	k, er := registry.OpenKey(registry.LOCAL_MACHINE, key, registry.QUERY_VALUE|registry.SET_VALUE)
-	if er == nil {
-		key = ""
-		old, _, er := k.GetStringValue(key)
+	var er error
+	for _, rk := range []registry.Key{registry.LOCAL_MACHINE, registry.CURRENT_USER} {
+		k, er := registry.OpenKey(rk, key, registry.QUERY_VALUE|registry.SET_VALUE)
 		if er == nil {
-			for _, xVNC := range VNCs {
-				if !strings.Contains(old, xVNC["name"]) {
-					continue
+			key = ""
+			old, _, er := k.GetStringValue(key)
+			if er == nil {
+				for _, xVNC := range VNCs {
+					if !strings.Contains(old, xVNC["name"]) {
+						continue
+					}
+					dir := filepath.Dir(old)
+					if stat, err := os.Stat(dir); err == nil && stat.IsDir() {
+						VNC = xVNC
+						VNC["path"] = dir
+						break
+					}
 				}
-				dir := filepath.Dir(old)
-				if stat, err := os.Stat(dir); err == nil && stat.IsDir() {
-					VNC = xVNC
-					VNC["path"] = dir
-					break
-				}
+			} else {
+				PrintOk(key, er)
 			}
+			k.Close()
 		} else {
 			PrintOk(key, er)
 		}
-		k.Close()
-	} else {
-		PrintOk(key, er)
 	}
 
 	if VNC["path"] == "" {
