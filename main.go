@@ -33,8 +33,6 @@ go get github.com/mitchellh/go-ps
 go get github.com/zzl/go-win32api/v2
 
 go-winres init
-git tag -F VERSION
-git push origin --tags
 go get -u
 */
 package main
